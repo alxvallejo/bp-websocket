@@ -1,15 +1,19 @@
 require('dotenv').config();
-const { WebSocketServer } = require('ws');
 const express = require('express');
 const http = require('http');
+const WebSocket = require('ws');
+
 const app = express();
 const server = http.createServer(app);
-const wsServer = new WebSocketServer({ server });
+
+// const wsServer = new WebSocketServer({ server });
+const wsServer = new WebSocket.Server({ server });
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const openAi = require('./services/openai');
 
-const port = 8000;
+const port = 8080; // express
+const wsPort = 8000; // WebSocket
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -29,18 +33,13 @@ app.get('/newGame', async (req, res) => {
 const clients = {};
 
 // A new client connection request received
-wsServer.on('connection', function (connection) {
+wsServer.on('connection', function (ws) {
   // Generate a unique code for every user
-  const userId = uuidv4();
   console.log(`Recieved a new connection.`);
-
-  // Store the new connection and handle messages
-  clients[userId] = connection;
-  console.log(`${userId} connected.`);
 });
 
-app.listen(8080, () => console.log('express listening on port 8080'));
+app.listen(port, () => console.log(`express listening on port ${port}`));
 
-server.listen(port, () => {
-  console.log(`WebSocket server is running on port ${port}`);
+server.listen(wsPort, () => {
+  console.log(`WebSocket server is running on port ${wsPort}`);
 });
