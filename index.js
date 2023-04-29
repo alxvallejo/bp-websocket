@@ -1,19 +1,26 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 const http = require('http');
-const WebSocket = require('ws');
+// const WebSocket = require('ws');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
 
 // const ws = new WebSocketServer({ server });
-const wss = new WebSocket.Server({ server });
-const cors = require('cors');
-const bodyParser = require('body-parser');
+// const wss = new WebSocket.Server({ server });
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:3000',
+  },
+});
+
 const openAi = require('./services/openai');
 
 const port = 8080; // express
-const wsPort = 8000; // WebSocket
+const wsPort = 4000; // WebSocket
 
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -29,63 +36,43 @@ app.get('/newGame', async (req, res) => {
   }
 });
 
-// app.post('/signIn', async (req, res) => {
-//   console.log('req: ', req);
-// });
-
-// I'm maintaining all active connections in this object
-let clients = {};
 let players = [];
 
 // A new client connection request received
-wss.on('connection', function (ws) {
-  // Generate a unique code for every user
+io.on('connection', function (socket) {
   console.log(`Recieved a new connection.`);
+  socket.emit('message', 'We see you');
 
-  ws.send(JSON.stringify({ message: 'We see you' }));
-
-  ws.on('message', (data, isBinary) => {
-    // RULE: Send only JSON friendly data so it can be parsed without a try/catch here :)
-    const message = isBinary ? data : JSON.parse(data.toString());
-
-    console.log('message', message);
-    console.log('message type', typeof message);
-
-    // const test = JSON.parse(message);
-    // console.log('test: ', test);
-
-    const handleSend = (data) => {
-      const payload = JSON.stringify(data);
-      console.log('payload: ', payload);
-      ws.send(payload);
-    };
-
-    if (!message.type) {
+  socket.on('signIn', (userData) => {
+    const email = userData.email;
+    const name = userData.name || email;
+    socket.email = email;
+    // Check if already signed in
+    const match = players.find((x) => (x.email = email));
+    if (match) {
       return;
     }
-    if (message.type == 'signIn' && message.user) {
-      const email = message.user.email;
-      const name = message.user?.name || email;
-      ws.email = email;
-      // clients.push(ws);
-      clients[email] = ws;
-      console.log('players: ', players);
-      players.push({
-        name,
-        email,
-      });
-      console.log('players: ', players);
-      ws.send(JSON.stringify({ type: 'players', data: players }));
-    }
+    console.log('players: ', players);
+    players.push({
+      name,
+      email,
+    });
+    console.log('players: ', players);
+    socket.emit('players', players);
   });
 
-  ws.on('close', (code, reason) => {
-    delete players[ws.email];
-    console.log('ws.email: ', ws.email);
+  socket.on('disconnect', (reason) => {
+    players = players.filter((x) => x.email !== socket.email);
+    console.log('socket.email: ', socket.email);
+    socket.emit('players', players);
   });
 });
 
-app.listen(port, () => console.log(`express listening on port ${port}`));
+// app.listen(port, () => console.log(`express listening on port ${port}`));
+
+app.get('/', (req, res) => {
+  res.send('Hello world');
+});
 
 server.listen(wsPort, () => {
   console.log(`WebSocket server is running on port ${wsPort}`);
