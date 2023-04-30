@@ -115,8 +115,10 @@ io.on('connection', function (socket) {
     );
 
     if (matchingOption && (matchingPlayerIndex || matchingPlayerIndex === 0)) {
-      console.log('matching answer found, updating player');
+      console.log('matching answer found, updating player', players);
       socket.answer = matchingOption;
+      const isCorrect = correctAnswer.option == matchingOption;
+      const email = players[matchingPlayerIndex]['email'];
       players[matchingPlayerIndex]['answered'] = true;
       io.emit('players', players);
 
@@ -126,8 +128,25 @@ io.on('connection', function (socket) {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        timeoutId = setTimeout(() => {
+        timeoutId = setTimeout(async () => {
           io.emit('answer', correctAnswer);
+          players[matchingPlayerIndex]['isCorrect'] = isCorrect;
+          io.emit('players', players);
+
+          // Save score
+          const playerData = players[matchingPlayerIndex]['playerData'];
+          if (playerData) {
+            const existingScore = playerData['score'];
+            const { data, error } = await supabase
+              .from('users')
+              .update({ email, score: existingScore + 1 })
+              .eq('id', playerData['id']);
+          } else {
+            const { data, error } = await supabase
+              .from('users')
+              .insert({ email, score: 1 });
+          }
+
           // Reset state
           resetGame();
           players = [];
@@ -136,7 +155,8 @@ io.on('connection', function (socket) {
     }
   });
 
-  socket.on('signIn', (userData) => {
+  socket.on('signIn', async (userData) => {
+    console.log('players: ', players);
     const email = userData.email;
     const name = userData.name || email;
     socket.email = email;
@@ -145,20 +165,26 @@ io.on('connection', function (socket) {
     if (match) {
       return;
     }
-    console.log('players: ', players);
-    players.push({
+    let playerData = {
       name,
       email,
       answered: false,
-    });
-    console.log('players: ', players);
-    io.emit('players', players);
+    };
 
-    // Start new game if necessary
-    // if (players.length >= MIN_PLAYERS && !fetchingNewGame) {
-    //   fetchingNewGame = true;
-    //   handleNewGame();
-    // }
+    // Grab scores from supabase
+    const { data, error } = await supabase
+      .from('users')
+      .select()
+      .eq('email', email);
+
+    if (data) {
+      playerData['playerData'] = data;
+    }
+
+    players.push(playerData);
+    console.log('players: ', players);
+
+    io.emit('players', players);
   });
 
   socket.on('disconnect', (reason) => {
