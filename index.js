@@ -13,7 +13,7 @@ const server = http.createServer(app);
 // const wss = new WebSocket.Server({ server });
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'https://indie-8bb1.fly.dev/'],
+    origin: ['http://localhost:3000', 'https://indie-8bb1.fly.dev'],
   },
 });
 
