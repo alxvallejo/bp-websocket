@@ -185,6 +185,10 @@ io.on('connection', function (socket) {
     console.log('players: ', players);
 
     io.emit('players', players);
+
+    if (category) {
+      io.emit('category', category);
+    }
   });
 
   socket.on('disconnect', (reason) => {
