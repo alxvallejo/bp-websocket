@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
+const { Game } = require('./Game');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,7 +14,13 @@ const server = http.createServer(app);
 // const wss = new WebSocket.Server({ server });
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'https://indie-8bb1.fly.dev'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://indie-8bb1.fly.dev',
+      'http://192.168.1.170:3000',
+      'http://192.168.1.170:3001',
+    ],
   },
 });
 
@@ -26,6 +33,8 @@ const openAi = require('./services/openai');
 const port = 8080; // express
 const wsPort = 4000; // WebSocket
 
+const roomName = 'trivia';
+
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -33,168 +42,185 @@ app.use(bodyParser.json());
 const MIN_PLAYERS = 1;
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
 let timeoutId;
-let fetchingNewGame = false;
-let category;
-let newGame = {};
-let correctAnswer;
 
-// app.get('/newGame', async (req, res) => {
-//   try {
-//     let resp = await openAi.newGame();
-//     resp = openAi.parseForPlayer(resp);
-//     res.send(resp);
-//   } catch (e) {
-//     res.send(e);
-//   }
-// });
+// Game callback fns
+// These are used as callbacks from the Game object's state.
 
-let players = [];
+const presenceCb = (players) => {
+  console.log('broadcasting player list', players);
+  io.emit('players', players);
+};
+
+const propogateScores = async (players) => {
+  console.log('propogating scores');
+  // If all players have answered, start a timeout and then emit the answer
+  const unanswered = players.filter((x) => !x.answered);
+  if (unanswered.length == 0) {
+    console.log(
+      'All players have answered, setTimeout for reporting final scores'
+    );
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(async () => {
+      const correctAnswer = game.getAnswer();
+      io.emit('answer', correctAnswer);
+
+      // Return playerScores
+      const players = game.getPlayerScores();
+      io.emit('players', players);
+
+      // Save scores
+      players.map(async (player, i) => {
+        const playerData = player.playerData;
+        const email = player.email;
+        const isCorrect = player.isCorrect;
+        let newScore;
+        if (playerData.score) {
+          newScore = isCorrect ? playerData.score + 1 : playerData.score;
+        } else {
+          newScore = isCorrect ? 1 : 0;
+        }
+        if (playerData) {
+          const { data, error } = await supabase
+            .from('users')
+            .update({ email, score: newScore })
+            .eq('id', playerData['id'])
+            .select();
+        } else {
+          const { data, error } = await supabase
+            .from('users')
+            .insert({ email, score: newScore })
+            .select();
+        }
+      });
+
+      // Finally, reset game state
+      game.reset();
+    }, ANSWER_BUFFER * 1000);
+  }
+};
+
+// Instantiate the class
+const game = new Game(presenceCb, propogateScores);
 
 // A new client connection request received
 io.on('connection', function (socket) {
   console.log(`Recieved a new connection.`);
-  socket.emit('message', 'We see you');
+  socket.emit('message', `You are socket ${socket.id}`);
 
-  const handleNewGame = async () => {
-    if (!category) {
-      console.log('No category sele');
-      return;
-    }
-    if (Object.keys(newGame).length !== 0) {
-      console.log('newGame already exists: ', newGame);
-      const parsed = openAi.parseForPlayer(newGame);
-      io.emit('newGame', parsed);
-      // return newGame;
-    } else {
-      console.log('fetching new game...');
-      let resp = await openAi.newGame(category);
-      newGame = resp;
-      console.log('newGame: ', newGame);
-      correctAnswer = newGame.options.find((x) => x.isAnswer);
+  // Grab players and emit them
+  // presenceCb(game.getPlayers());
+  const players = game.getPlayers();
+  console.log('players: ', players);
+  // io.emit('players', players);
 
-      const parsed = openAi.parseForPlayer(resp);
-      io.emit('newGame', parsed);
-      // console.log('type', typeof resp);
+  // Check if newGame is set
+  const newGame = game.getGame();
+  console.log('newGame: ', newGame);
+  // const category = game.getCategory()
+  if (newGame) {
+    io.emit('newGame', newGame);
+  }
+  // else if (category) {
+
+  // }
+
+  // On category select, start the game and dispatch the question
+  socket.on('category', async (newCategory) => {
+    console.log('newCategory: ', newCategory);
+
+    const existingCategory = game.getCategory();
+    if (existingCategory) {
+      console.log('existingCategory', existingCategory);
       // return;
     }
-  };
-
-  const resetGame = () => {
-    (timeoutId = null),
-      (fetchingNewGame = false),
-      (category = null),
-      (newGame = {}),
-      (correctAnswer = null);
-  };
-
-  socket.on('category', (newCategory) => {
-    console.log('newCategory: ', newCategory);
-    if (category) {
-      console.log('already a category: ', category);
-
-      return;
-    }
-    category = newCategory;
     // Let everyone know what the category is
     io.emit('category', newCategory);
 
-    // Ask Chat GPT for question
-    handleNewGame();
+    game.setCategory(newCategory);
+    const newGame = await openAi.newGame(newCategory);
+    console.log('newGame: ', newGame);
+
+    // Save new game
+    const { data, error } = await supabase
+      .from('games')
+      .insert({ game: newGame })
+      .select();
+
+    if (error) {
+      console.log('error: ', error);
+      io.emit('newGameError', error);
+      return;
+    }
+
+    console.log('data: ', data);
+    const gameId = data[0].id;
+
+    const savedGame = { ...newGame, gameId };
+
+    game.setGame(savedGame);
+
+    const parsed = openAi.parseForPlayer(savedGame);
+    console.log('Emitting parsed game: ', parsed);
+    io.emit('newGame', parsed);
   });
 
-  socket.on('answer', (answer) => {
+  socket.on('answer', (email, answer) => {
+    console.log('email: ', email);
     console.log('answer: ', answer);
-    console.log('newGame: ', newGame);
-    // Determine option
-    const matchingOption = newGame.options.find((x) => x.option == answer);
 
-    console.log('matchingOption: ', matchingOption);
-    console.log('players: ', players);
-    const matchingPlayerIndex = players.findIndex(
-      (x) => x.email == socket.email
-    );
-
-    if (matchingOption && (matchingPlayerIndex || matchingPlayerIndex === 0)) {
-      console.log('matching answer found, updating player', players);
-      socket.answer = matchingOption;
-      const isCorrect = correctAnswer.option == matchingOption;
-      const email = players[matchingPlayerIndex]['email'];
-      players[matchingPlayerIndex]['answered'] = true;
-      io.emit('players', players);
-
-      // If all players have answered, start a timeout and then emit the answer
-      const unanswered = players.filter((x) => !x.answered);
-      if (unanswered.length == 0) {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-        timeoutId = setTimeout(async () => {
-          io.emit('answer', correctAnswer);
-          players[matchingPlayerIndex]['isCorrect'] = isCorrect;
-          io.emit('players', players);
-
-          // Save score
-          const playerData = players[matchingPlayerIndex]['playerData'];
-          if (playerData) {
-            const existingScore = playerData['score'];
-            const { data, error } = await supabase
-              .from('users')
-              .update({ email, score: existingScore + 1 })
-              .eq('id', playerData['id']);
-          } else {
-            const { data, error } = await supabase
-              .from('users')
-              .insert({ email, score: 1 });
-          }
-
-          // Reset state
-          resetGame();
-          players = [];
-        }, ANSWER_BUFFER * 1000);
-      }
-    }
+    game.submitAnswer(email, answer);
+    const players = game.getPlayers();
+    io.emit('players', players);
   });
 
   socket.on('signIn', async (userData) => {
-    console.log('players: ', players);
+    console.log('userData on SignIn: ', userData);
+    socket.emit('message', `${userData.email} Joining room ${roomName}`);
     const email = userData.email;
     const name = userData.name || email;
-    socket.email = email;
-    // Check if already signed in
-    const match = players.find((x) => (x.email = email));
-    if (match) {
-      return;
-    }
     let playerData = {
+      socketId: socket.id,
       name,
       email,
       answered: false,
     };
-
     // Grab scores from supabase
     const { data, error } = await supabase
       .from('users')
       .select()
       .eq('email', email);
-
     if (data) {
       playerData['playerData'] = data;
     }
 
-    players.push(playerData);
-    console.log('players: ', players);
-
+    const players = game.setPlayer(email, playerData);
     io.emit('players', players);
 
+    // Additionally check for latest game status
+    const existingGame = game.getGame();
+    const category = game.getCategory();
     if (category) {
-      io.emit('category', category);
+      socket.emit('category', category);
+    }
+    if (existingGame) {
+      const parsed = openAi.parseForPlayer(savedGame);
+      console.log('Emitting parsed game: ', parsed);
+      socket.emit('newGame', parsed);
     }
   });
 
+  socket.on('signOut', (email) => {
+    console.log('email: ', email);
+    console.log('socket id on signout', socket.id);
+  });
+
   socket.on('disconnect', (reason) => {
-    players = players.filter((x) => x.email !== socket.email);
-    console.log('socket.email: ', socket.email);
-    io.emit('players', players);
+    // players = players.filter((x) => x.socketId !== socket.id);
+    // players[socket.id] = null;
+    console.log('disconnecting', socket.id);
+    io.emit('signOut', socket.id);
   });
 });
 
