@@ -7,6 +7,7 @@ class Game {
     this.category = null;
     this.newGame = null;
     this.correctAnswer = null;
+    this.correctAnswerIndex = null;
   }
 
   reset = () => {
@@ -15,6 +16,7 @@ class Game {
     this.category = null;
     this.newGame = null;
     this.correctAnswer = null;
+    this.correctAnswerIndex = null;
   };
 
   getPlayers = () => {
@@ -47,6 +49,9 @@ class Game {
   };
 
   setGame = (newGame) => {
+    if (!newGame || !newGame.options) {
+      return;
+    }
     const correctAnswer = newGame.options.find((x) => x.isAnswer);
     this.newGame = newGame;
     this.correctAnswer = correctAnswer;
@@ -88,7 +93,7 @@ class Game {
     }
     // Loop through player answers and update the players object with `isCorrect`
     this.playerAnswers.map((player, i) => {
-      const isCorrect = this.correctAnswer == player.answer;
+      const isCorrect = this.correctAnswer.option == player.answer;
       const email = player.email;
       this.players[email]['isCorrect'] = isCorrect;
     });

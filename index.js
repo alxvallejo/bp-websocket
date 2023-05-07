@@ -71,17 +71,22 @@ const propogateScores = async (players) => {
       io.emit('players', players);
 
       // Save scores
-      players.map(async (player, i) => {
+      let updatedPlayers = [];
+      for (let player of players) {
         const playerData = player.playerData;
+        console.log('player: ', player);
+        console.log('playerData: ', playerData);
         const email = player.email;
         const isCorrect = player.isCorrect;
         let newScore;
-        if (playerData.score) {
+        if (playerData?.score) {
           newScore = isCorrect ? playerData.score + 1 : playerData.score;
         } else {
           newScore = isCorrect ? 1 : 0;
         }
+        const newPlayerData = { ...playerData, score: newScore };
         if (playerData) {
+          console.log('updating playerData: ', playerData);
           const { data, error } = await supabase
             .from('users')
             .update({ email, score: newScore })
@@ -93,7 +98,17 @@ const propogateScores = async (players) => {
             .insert({ email, score: newScore })
             .select();
         }
-      });
+        const updatedPlayer = {
+          ...player,
+          playerData: newPlayerData,
+        };
+        updatedPlayers.push(updatedPlayer);
+      }
+
+      console.log('updatedPlayers: ', updatedPlayers);
+
+      // Emit the updated players with new scores
+      io.emit('playerScores', updatedPlayers);
 
       // Finally, reset game state
       game.reset();
@@ -192,7 +207,7 @@ io.on('connection', function (socket) {
       .select()
       .eq('email', email);
     if (data) {
-      playerData['playerData'] = data;
+      playerData['playerData'] = data[0];
     }
 
     const players = game.setPlayer(email, playerData);
@@ -200,12 +215,14 @@ io.on('connection', function (socket) {
 
     // Additionally check for latest game status
     const existingGame = game.getGame();
+    console.log('existingGame: ', existingGame);
     const category = game.getCategory();
     if (category) {
+      console.log('category: ', category);
       socket.emit('category', category);
     }
     if (existingGame) {
-      const parsed = openAi.parseForPlayer(savedGame);
+      const parsed = openAi.parseForPlayer(existingGame);
       console.log('Emitting parsed game: ', parsed);
       socket.emit('newGame', parsed);
     }
@@ -214,6 +231,11 @@ io.on('connection', function (socket) {
   socket.on('signOut', (email) => {
     console.log('email: ', email);
     console.log('socket id on signout', socket.id);
+  });
+
+  socket.on('resetGame', (email) => {
+    game.reset();
+    io.emit('resetGame', `${email} reset the game!`);
   });
 
   socket.on('disconnect', (reason) => {
