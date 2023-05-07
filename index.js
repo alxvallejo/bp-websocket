@@ -135,7 +135,9 @@ io.on('connection', function (socket) {
   console.log('newGame: ', newGame);
   // const category = game.getCategory()
   if (newGame) {
-    io.emit('newGame', newGame);
+    const parsed = openAi.parseForPlayer(existingGame);
+    console.log('Emitting parsed game: ', parsed);
+    socket.emit('newGame', parsed);
   }
   // else if (category) {
 
@@ -243,6 +245,7 @@ io.on('connection', function (socket) {
     // players[socket.id] = null;
     console.log('disconnecting', socket.id);
     io.emit('signOut', socket.id);
+    socket.removeAllListeners();
   });
 });
 
