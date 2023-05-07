@@ -131,10 +131,10 @@ io.on('connection', function (socket) {
   // io.emit('players', players);
 
   // Check if newGame is set
-  const newGame = game.getGame();
-  console.log('newGame: ', newGame);
+  const existingGame = game.getGame();
+  console.log('existingGame: ', existingGame);
   // const category = game.getCategory()
-  if (newGame) {
+  if (existingGame) {
     const parsed = openAi.parseForPlayer(existingGame);
     console.log('Emitting parsed game: ', parsed);
     socket.emit('newGame', parsed);
@@ -144,7 +144,7 @@ io.on('connection', function (socket) {
   // }
 
   // On category select, start the game and dispatch the question
-  socket.on('category', async (newCategory) => {
+  socket.on('category', async (name, newCategory) => {
     console.log('newCategory: ', newCategory);
 
     const existingCategory = game.getCategory();
@@ -153,7 +153,7 @@ io.on('connection', function (socket) {
       // return;
     }
     // Let everyone know what the category is
-    io.emit('category', newCategory);
+    io.emit('category', name, newCategory);
 
     game.setCategory(newCategory);
     const newGame = await openAi.newGame(newCategory);
