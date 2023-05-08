@@ -77,6 +77,8 @@ const propogateScores = async (players) => {
         console.log('player: ', player);
         console.log('playerData: ', playerData);
         const email = player.email;
+        const name = player.name;
+        console.log('name: ', name);
         const isCorrect = player.isCorrect;
         let newScore;
         if (playerData?.score) {
@@ -89,13 +91,13 @@ const propogateScores = async (players) => {
           console.log('updating playerData: ', playerData);
           const { data, error } = await supabase
             .from('users')
-            .update({ email, score: newScore })
+            .update({ email, name, score: newScore })
             .eq('id', playerData['id'])
             .select();
         } else {
           const { data, error } = await supabase
             .from('users')
-            .insert({ email, score: newScore })
+            .insert({ email, name, score: newScore })
             .select();
         }
         const updatedPlayer = {
@@ -108,7 +110,11 @@ const propogateScores = async (players) => {
       console.log('updatedPlayers: ', updatedPlayers);
 
       // Emit the updated players with new scores
-      io.emit('playerScores', updatedPlayers);
+      // Additionally retrieve user scores
+      const { data: playerStats, error: userDataError } = await supabase
+        .from('users')
+        .select();
+      io.emit('playerStats', playerStats, true);
 
       // Finally, reset game state
       game.reset();
@@ -126,22 +132,17 @@ io.on('connection', function (socket) {
 
   // Grab players and emit them
   // presenceCb(game.getPlayers());
-  const players = game.getPlayers();
-  console.log('players: ', players);
-  // io.emit('players', players);
+  // const players = game.getPlayers();
+  // console.log('players: ', players);
 
   // Check if newGame is set
   const existingGame = game.getGame();
   console.log('existingGame: ', existingGame);
-  // const category = game.getCategory()
   if (existingGame) {
     const parsed = openAi.parseForPlayer(existingGame);
     console.log('Emitting parsed game: ', parsed);
     socket.emit('newGame', parsed);
   }
-  // else if (category) {
-
-  // }
 
   // On category select, start the game and dispatch the question
   socket.on('category', async (name, newCategory) => {
@@ -230,6 +231,14 @@ io.on('connection', function (socket) {
     }
   });
 
+  socket.on('playerStats', async () => {
+    // Additionally retrieve user scores
+    const { data: playerStats, error: userDataError } = await supabase
+      .from('users')
+      .select();
+    socket.emit('playerStats', playerStats);
+  });
+
   socket.on('signOut', (email) => {
     console.log('email: ', email);
     console.log('socket id on signout', socket.id);
@@ -244,7 +253,7 @@ io.on('connection', function (socket) {
     // players = players.filter((x) => x.socketId !== socket.id);
     // players[socket.id] = null;
     console.log('disconnecting', socket.id);
-    io.emit('signOut', socket.id);
+    // io.emit('signOut', socket.id);
     socket.removeAllListeners();
   });
 });

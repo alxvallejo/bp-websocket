@@ -7,7 +7,7 @@ class Game {
     this.category = null;
     this.newGame = null;
     this.correctAnswer = null;
-    this.correctAnswerIndex = null;
+    this.answerImg = null;
   }
 
   reset = () => {
@@ -16,7 +16,7 @@ class Game {
     this.category = null;
     this.newGame = null;
     this.correctAnswer = null;
-    this.correctAnswerIndex = null;
+    this.answerImg = null;
   };
 
   getPlayers = () => {
@@ -69,6 +69,10 @@ class Game {
     return this.correctAnswer;
   };
 
+  getAnswerImg = () => {
+    return this.answerImg;
+  };
+
   setPlayerAnswer = (email, answer) => {
     let playerAnswers = this.playerAnswers || [];
     playerAnswers = [...playerAnswers, { email, answer }];
@@ -76,6 +80,9 @@ class Game {
   };
 
   submitAnswer = (email, answer) => {
+    if (!this.newGame) {
+      return;
+    }
     const options = this.newGame.options;
     const matchingOption = options.find((x) => x.option == answer);
     let updatePlayer = this.getPlayer(email);
