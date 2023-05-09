@@ -122,6 +122,14 @@ const propogateScores = async (players) => {
   }
 };
 
+const dispatchUserCategories = async () => {
+  const { data: userCategories, error: getCatsError } = await supabase
+    .from('categories')
+    .select();
+  console.log('userCategories: ', userCategories);
+  io.emit('userCategories', userCategories);
+};
+
 // Instantiate the class
 const game = new Game(presenceCb, propogateScores);
 
@@ -229,6 +237,13 @@ io.on('connection', function (socket) {
       console.log('Emitting parsed game: ', parsed);
       socket.emit('newGame', parsed);
     }
+
+    // Dispatch userCategories
+    const { data: userCategories, error: getCatsError } = await supabase
+      .from('categories')
+      .select();
+    console.log('userCategories: ', userCategories);
+    io.emit('userCategories', userCategories);
   });
 
   socket.on('playerStats', async () => {
@@ -249,6 +264,22 @@ io.on('connection', function (socket) {
     io.emit('resetGame', `${email} reset the game!`);
   });
 
+  socket.on('addCategory', async (category, created_by) => {
+    const { data: newCategory, error: newCatError } = await supabase
+      .from('categories')
+      .insert({ name: category, created_by })
+      .select();
+    dispatchUserCategories();
+  });
+
+  socket.on('deleteCategory', async (categoryId) => {
+    const { data: newCategory, error: newCatError } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+    dispatchUserCategories();
+  });
+
   socket.on('disconnect', (reason) => {
     // players = players.filter((x) => x.socketId !== socket.id);
     // players[socket.id] = null;
@@ -259,6 +290,24 @@ io.on('connection', function (socket) {
 });
 
 // app.listen(port, () => console.log(`express listening on port ${port}`));
+
+app.get('/categories', async (req, res) => {
+  const { data: categories, error: userDataError } = await supabase
+    .from('categories')
+    .select();
+  res.send(JSON.stringify(categories));
+});
+
+app.post('/addCategory', async (req, res) => {
+  console.log('req.body: ', req.body);
+  const { category, created_by } = req.body;
+  const { data: newCategory, error: userDataError } = await supabase
+    .from('categories')
+    .insert({ category, created_by })
+    .select();
+
+  res.send('Adding category');
+});
 
 app.get('/', (req, res) => {
   res.send('Hello world');
