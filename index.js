@@ -125,6 +125,13 @@ const dispatchUserCategories = async () => {
   io.emit('userCategories', userCategories);
 };
 
+const dispatchMyCategories = async (socket) => {
+  const { data: userCategories, error: getCatsError } = await supabase
+    .from('categories')
+    .select();
+  socket.emit('userCategories', userCategories);
+};
+
 // Instantiate the class
 const game = new Game(presenceCb, propogateScores);
 
@@ -147,7 +154,7 @@ io.on('connection', function (socket) {
     socket.emit('newGame', parsed);
   }
 
-  // dispatchUserCategories();
+  dispatchMyCategories(socket);
 
   // On category select, start the game and dispatch the question
   socket.on('category', async (name, newCategory) => {
