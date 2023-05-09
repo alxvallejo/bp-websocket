@@ -185,7 +185,7 @@ io.on('connection', function (socket) {
     console.log('data: ', data);
     const gameId = data[0].id;
 
-    const savedGame = { ...newGame, gameId };
+    const savedGame = { ...newGame, gameId, category: newCategory };
 
     game.setGame(savedGame);
 
