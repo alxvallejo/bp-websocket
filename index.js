@@ -152,6 +152,8 @@ io.on('connection', function (socket) {
     socket.emit('newGame', parsed);
   }
 
+  // dispatchUserCategories();
+
   // On category select, start the game and dispatch the question
   socket.on('category', async (name, newCategory) => {
     console.log('newCategory: ', newCategory);
@@ -237,13 +239,7 @@ io.on('connection', function (socket) {
       console.log('Emitting parsed game: ', parsed);
       socket.emit('newGame', parsed);
     }
-
-    // Dispatch userCategories
-    const { data: userCategories, error: getCatsError } = await supabase
-      .from('categories')
-      .select();
-    console.log('userCategories: ', userCategories);
-    io.emit('userCategories', userCategories);
+    dispatchUserCategories();
   });
 
   socket.on('playerStats', async () => {
