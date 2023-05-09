@@ -39,7 +39,6 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-const MIN_PLAYERS = 1;
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
 let timeoutId;
 
@@ -74,11 +73,8 @@ const propogateScores = async (players) => {
       let updatedPlayers = [];
       for (let player of players) {
         const playerData = player.playerData;
-        console.log('player: ', player);
-        console.log('playerData: ', playerData);
         const email = player.email;
         const name = player.name;
-        console.log('name: ', name);
         const isCorrect = player.isCorrect;
         let newScore;
         if (playerData?.score) {
@@ -126,7 +122,6 @@ const dispatchUserCategories = async () => {
   const { data: userCategories, error: getCatsError } = await supabase
     .from('categories')
     .select();
-  console.log('userCategories: ', userCategories);
   io.emit('userCategories', userCategories);
 };
 
@@ -214,6 +209,12 @@ io.on('connection', function (socket) {
       email,
       answered: false,
     };
+    // Get game rules
+    const { data: rules, error: rulesError } = await supabase
+      .from('rules')
+      .select()
+      .limit(1);
+    io.emit('gameRules', rules[0]);
     // Grab scores from supabase
     const { data, error } = await supabase
       .from('users')
