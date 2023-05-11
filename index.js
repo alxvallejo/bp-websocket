@@ -132,6 +132,15 @@ const dispatchMyCategories = async (socket) => {
   socket.emit('userCategories', userCategories);
 };
 
+const dispatchGameRules = async (socket) => {
+  // Get game rules
+  const { data: rules, error: rulesError } = await supabase
+    .from('rules')
+    .select()
+    .limit(1);
+  socket.emit('gameRules', rules[0]);
+};
+
 // Instantiate the class
 const game = new Game(presenceCb, propogateScores);
 
@@ -155,6 +164,7 @@ io.on('connection', function (socket) {
   }
 
   dispatchMyCategories(socket);
+  dispatchGameRules(socket);
 
   // On category select, start the game and dispatch the question
   socket.on('category', async (name, newCategory) => {
@@ -216,12 +226,7 @@ io.on('connection', function (socket) {
       email,
       answered: false,
     };
-    // Get game rules
-    const { data: rules, error: rulesError } = await supabase
-      .from('rules')
-      .select()
-      .limit(1);
-    io.emit('gameRules', rules[0]);
+
     // Grab scores from supabase
     const { data, error } = await supabase
       .from('users')
@@ -266,6 +271,15 @@ io.on('connection', function (socket) {
   socket.on('resetGame', (email) => {
     game.reset();
     io.emit('resetGame', `${email} reset the game!`);
+  });
+
+  socket.on('editMinPlayers', async (newMinPlayers) => {
+    const { data: rules, error: rulesError } = await supabase
+      .from('rules')
+      .update({ min_players: newMinPlayers })
+      .eq('id', 1)
+      .select();
+    io.emit('gameRules', rules[0]);
   });
 
   socket.on('addCategory', async (category, created_by) => {
