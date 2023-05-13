@@ -86,14 +86,14 @@ const propogateScores = async (players) => {
         if (playerData) {
           console.log('updating playerData: ', playerData);
           const { data, error } = await supabase
-            .from('users')
-            .update({ email, name, score: newScore })
+            .from('profiles')
+            .update({ score: newScore })
             .eq('id', playerData['id'])
             .select();
         } else {
           const { data, error } = await supabase
-            .from('users')
-            .insert({ email, name, score: newScore })
+            .from('profiles')
+            .insert({ score: newScore })
             .select();
         }
         const updatedPlayer = {
@@ -108,7 +108,7 @@ const propogateScores = async (players) => {
       // Emit the updated players with new scores
       // Additionally retrieve user scores
       const { data: playerStats, error: userDataError } = await supabase
-        .from('users')
+        .from('profiles')
         .select();
       io.emit('playerStats', playerStats, true);
 
@@ -229,7 +229,7 @@ io.on('connection', function (socket) {
 
     // Grab scores from supabase
     const { data, error } = await supabase
-      .from('users')
+      .from('profiles')
       .select()
       .eq('email', email);
     if (data) {
@@ -258,7 +258,7 @@ io.on('connection', function (socket) {
   socket.on('playerStats', async () => {
     // Additionally retrieve user scores
     const { data: playerStats, error: userDataError } = await supabase
-      .from('users')
+      .from('profiles')
       .select();
     socket.emit('playerStats', playerStats);
   });
