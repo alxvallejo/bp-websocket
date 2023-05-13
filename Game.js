@@ -8,6 +8,7 @@ class Game {
     this.newGame = null;
     this.correctAnswer = null;
     this.answerImg = null;
+    this.answerContext = null;
   }
 
   reset = () => {
@@ -17,6 +18,7 @@ class Game {
     this.newGame = null;
     this.correctAnswer = null;
     this.answerImg = null;
+    this.answerContext = null;
   };
 
   getPlayers = () => {
@@ -55,6 +57,7 @@ class Game {
     const correctAnswer = newGame.options.find((x) => x.isAnswer);
     this.newGame = newGame;
     this.correctAnswer = correctAnswer;
+    this.answerContext = newGame.answerContext;
   };
 
   getGame = () => {
@@ -67,6 +70,10 @@ class Game {
 
   getAnswer = () => {
     return this.correctAnswer;
+  };
+
+  getAnswerContext = () => {
+    return this.answerContext;
   };
 
   getAnswerImg = () => {

@@ -9,7 +9,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 const newGamePrompt = (category) => {
-  return `Generate a trivia question in json format using a single property "question" for the category of ${category}, returning 4 possible answers under the property "options" along with whether each option is correct using a boolean property "isAnswer". Each option is in the format of "{ option, isAnswer }". Remove all line breaks from the json response and do not add a prefix to the json. Do not stringify the json. Make sure the json string is wrapped in brackets.`;
+  return `You can only respond in JSON format. Generate an interesting trivia question in json format using a single property "question" for the category of ${category}, returning 4 possible answers under the property "options" along with whether each option is correct using a boolean property "isAnswer". Each option is in the format of "{ option, isAnswer }". Additionally, provide a 2-3 sentence explanation for the answer using the property "answerContext". Remove all line breaks from the json response and do not add a prefix to the json. Do not stringify the json. Make sure the json string is wrapped in brackets.`;
 };
 
 const newGame = async (category) => {
@@ -31,7 +31,7 @@ const newGame = async (category) => {
     //   result = result.charAt(0) !== '[' ? '[' + result : result;
     //   result = result.slice(-1) !== ']' ? result + ']' : result;
     // }
-    // console.log('result: ', result);
+    console.log('result: ', result);
     const resp = JSON.parse(result);
     // console.log('resp: ', resp);
 
@@ -44,6 +44,8 @@ const newGame = async (category) => {
 const parseForPlayer = (resp) => {
   // Remove the answer from the payload
   let options = resp.options.map((a) => a.option);
+  // Additionally remove the answerContext field
+  delete resp.answerContext;
   return {
     ...resp,
     options,

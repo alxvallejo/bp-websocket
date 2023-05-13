@@ -18,6 +18,7 @@ const io = new Server(server, {
       'http://localhost:3000',
       'http://localhost:3001',
       'https://indie-8bb1.fly.dev',
+      'https://bowpourri-remix.netlify.app',
       'http://192.168.1.170:3000',
       'http://192.168.1.170:3001',
     ],
@@ -64,6 +65,9 @@ const propogateScores = async (players) => {
     timeoutId = setTimeout(async () => {
       const correctAnswer = game.getAnswer();
       io.emit('answer', correctAnswer);
+
+      const answerContext = game.getAnswerContext();
+      io.emit('answerContext', answerContext);
 
       // Return playerScores
       const players = game.getPlayerScores();
