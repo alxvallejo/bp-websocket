@@ -75,6 +75,7 @@ const propogateScores = async (players) => {
 
       // Save scores
       let updatedPlayers = [];
+      let correctPlayers = [];
       for (let player of players) {
         const playerData = player.playerData;
         const email = player.email;
@@ -85,6 +86,9 @@ const propogateScores = async (players) => {
           newScore = isCorrect ? playerData.score + 1 : playerData.score;
         } else {
           newScore = isCorrect ? 1 : 0;
+        }
+        if (isCorrect) {
+          correctPlayers.push(name);
         }
         const newPlayerData = { ...playerData, score: newScore };
         if (playerData) {
@@ -115,6 +119,15 @@ const propogateScores = async (players) => {
         .from('profiles')
         .select();
       io.emit('playerStats', playerStats, true);
+
+      // Update game record
+      const { data: gameUpdate, error: gameError } = await supabase
+        .from('games')
+        .update({
+          players: updatedPlayers,
+          winners: correctPlayers,
+          completed_on: new Date().toISOString(),
+        });
 
       // Finally, reset game state
       game.reset();
@@ -204,6 +217,11 @@ io.on('connection', function (socket) {
     const savedGame = { ...newGame, gameId, category: newCategory };
 
     game.setGame(savedGame);
+
+    // Additionally save category
+    const { data: gameUpdate, error: gameError } = await supabase
+      .from('games')
+      .update({ category: newCategory });
 
     const parsed = openAi.parseForPlayer(savedGame);
     console.log('Emitting parsed game: ', parsed);
