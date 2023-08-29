@@ -30,6 +30,7 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const openAi = require('./services/openai');
+const serp = require('./services/serp');
 
 const port = 8080; // express
 const wsPort = 4000; // WebSocket
@@ -68,6 +69,10 @@ const propogateScores = async (players) => {
 
       const answerContext = game.getAnswerContext();
       io.emit('answerContext', answerContext);
+
+      const answerImg = game.getAnswerImg();
+      console.log('answerImg on complete: ', answerImg);
+      io.emit('answerImg', answerImg);
 
       // Return playerScores
       const players = game.getPlayerScores();
@@ -225,6 +230,13 @@ io.on('connection', function (socket) {
     const parsed = openAi.parseForPlayer(savedGame);
     console.log('Emitting parsed game: ', parsed);
     io.emit('newGame', parsed);
+
+    const { keywords } = newGame;
+    const imgSearch = await serp.searchGoogleImages(keywords);
+    if (imgSearch) {
+      const randomImg = imgSearch[Math.floor(Math.random() * imgSearch.length)];
+      game.setAnswerImg(randomImg, keywords);
+    }
   };
 
   // On category select, start the game and dispatch the question
@@ -232,13 +244,9 @@ io.on('connection', function (socket) {
     handleNewGame(name, newCategory);
   });
 
-  socket.on('refreshGame', async (name) => {
-    const existingCategory = game.getCategory();
-    if (existingCategory) {
-      console.log('existingCategory', existingCategory);
-      // return;
-      handleNewGame(name, existingCategory);
-    }
+  socket.on('refreshGame', async (name, newCategory) => {
+    console.log(`${name} refreshed the game`);
+    handleNewGame(name, newCategory);
   });
 
   socket.on('answer', (email, answer) => {

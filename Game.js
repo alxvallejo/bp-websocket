@@ -9,6 +9,7 @@ class Game {
     this.correctAnswer = null;
     this.answerImg = null;
     this.answerContext = null;
+    this.keywords = null;
   }
 
   reset = () => {
@@ -19,6 +20,7 @@ class Game {
     this.correctAnswer = null;
     this.answerImg = null;
     this.answerContext = null;
+    this.keywords = null;
   };
 
   getPlayers = () => {
@@ -58,6 +60,7 @@ class Game {
     this.newGame = newGame;
     this.correctAnswer = correctAnswer;
     this.answerContext = newGame.answerContext;
+    this.keywords = newGame.keywords;
   };
 
   getGame = () => {
@@ -74,6 +77,13 @@ class Game {
 
   getAnswerContext = () => {
     return this.answerContext;
+  };
+
+  setAnswerImg = (image, keywords) => {
+    this.answerImg = {
+      image,
+      keywords,
+    };
   };
 
   getAnswerImg = () => {
@@ -93,6 +103,9 @@ class Game {
     const options = this.newGame.options;
     const matchingOption = options.find((x) => x.option == answer);
     let updatePlayer = this.getPlayer(email);
+    if (!updatePlayer) {
+      return;
+    }
     updatePlayer['answered'] = true;
     this.players[email] = updatePlayer;
     this.setPlayerAnswer(email, answer);
