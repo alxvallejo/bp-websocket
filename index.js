@@ -183,8 +183,7 @@ io.on('connection', function (socket) {
   dispatchMyCategories(socket);
   dispatchGameRules(socket);
 
-  // On category select, start the game and dispatch the question
-  socket.on('category', async (name, newCategory) => {
+  const handleNewGame = async (name, newCategory) => {
     console.log('newCategory: ', newCategory);
 
     const existingCategory = game.getCategory();
@@ -226,6 +225,20 @@ io.on('connection', function (socket) {
     const parsed = openAi.parseForPlayer(savedGame);
     console.log('Emitting parsed game: ', parsed);
     io.emit('newGame', parsed);
+  };
+
+  // On category select, start the game and dispatch the question
+  socket.on('category', async (name, newCategory) => {
+    handleNewGame(name, newCategory);
+  });
+
+  socket.on('refreshGame', async (name) => {
+    const existingCategory = game.getCategory();
+    if (existingCategory) {
+      console.log('existingCategory', existingCategory);
+      // return;
+      handleNewGame(name, existingCategory);
+    }
   });
 
   socket.on('answer', (email, answer) => {

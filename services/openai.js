@@ -42,8 +42,9 @@ const newGame = async (category) => {
 };
 
 const parseForPlayer = (resp) => {
+  console.log('parseForPlayer resp: ', resp);
   // Remove the answer from the payload
-  let options = resp.options.map((a) => a.option);
+  let options = resp.options?.map((a) => a.option);
   // Additionally remove the answerContext field
   delete resp.answerContext;
   return {
