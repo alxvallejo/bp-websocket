@@ -231,12 +231,12 @@ io.on('connection', function (socket) {
     console.log('Emitting parsed game: ', parsed);
     io.emit('newGame', parsed);
 
-    const { keywords } = newGame;
-    const imgSearch = await serp.searchGoogleImages(keywords);
-    if (imgSearch) {
-      const randomImg = imgSearch[Math.floor(Math.random() * imgSearch.length)];
-      game.setAnswerImg(randomImg, keywords);
-    }
+    // const { keywords } = newGame;
+    // const imgSearch = await serp.searchGoogleImages(keywords);
+    // if (imgSearch) {
+    //   const randomImg = imgSearch[Math.floor(Math.random() * imgSearch.length)];
+    //   game.setAnswerImg(randomImg, keywords);
+    // }
   };
 
   // On category select, start the game and dispatch the question
@@ -300,6 +300,15 @@ io.on('connection', function (socket) {
 
   socket.on('playerStats', async () => {
     // Additionally retrieve user scores
+    const { data: playerStats, error: userDataError } = await supabase
+      .from('profiles')
+      .select();
+    socket.emit('playerStats', playerStats);
+  });
+
+  socket.on('clearPlayerStats', async () => {
+    console.log('clearing stats');
+    const { error } = await supabase.from('profiles').update({ score: 0 });
     const { data: playerStats, error: userDataError } = await supabase
       .from('profiles')
       .select();

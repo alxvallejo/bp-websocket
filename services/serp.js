@@ -16,15 +16,19 @@ const searchGoogleImages = async (keywords) => {
     tbm: 'isch',
   };
   return new Promise((resolve) => {
-    search.json(query_params, (result) => {
-      console.log('result: ', result);
-      const { images_results } = result;
-      if (images_results.length > 5) {
-        resolve(images_results.slice(0, 4));
-      } else {
-        resolve(images_results);
-      }
-    });
+    try {
+      search.json(query_params, (result) => {
+        console.log('result: ', result);
+        const { images_results } = result;
+        if (images_results.length > 5) {
+          resolve(images_results.slice(0, 4));
+        } else {
+          resolve(images_results);
+        }
+      });
+    } catch (e) {
+      resolve(null);
+    }
   });
 };
 
