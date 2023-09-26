@@ -13,7 +13,11 @@ class Game {
   }
 
   reset = () => {
-    this.players = {};
+    // this.players = Object.keys(this.players.length) > 0 ? (
+    //   Object.keys(this.players).map(email => {
+    //     this.players[email] = Object
+    //   })
+    // ) : {};
     this.playerAnswers = null;
     this.category = null;
     this.newGame = null;
@@ -24,7 +28,9 @@ class Game {
   };
 
   getPlayers = () => {
-    return Object.values(this.players);
+    const players = Object.values(this.players);
+    console.log('players: ', players);
+    return players;
   };
 
   setPlayer = (email, playerData) => {
@@ -101,7 +107,7 @@ class Game {
       return;
     }
     const options = this.newGame.options;
-    const matchingOption = options.find((x) => x.option == answer);
+    // const matchingOption = options.find((x) => x.option == answer);
     let updatePlayer = this.getPlayer(email);
     if (!updatePlayer) {
       return;

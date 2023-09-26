@@ -6,6 +6,7 @@ const http = require('http');
 const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
 const { Game } = require('./Game');
+const { Standup } = require('./Standup');
 
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,19 @@ app.use(bodyParser.json());
 
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
 let timeoutId;
+
+// Standup callback fns
+
+// Emit the next set of players including the selectedSpinner
+const refreshWheel = (players, selectedSpinner) => {
+  console.log('refreshing wheel');
+  io.emit('refreshWheel', players, selectedSpinner);
+};
+
+const spinWheel = (nextWinnerEmail, nextPlayers) => {
+  console.log('spinning wheel');
+  io.emit('spinResults', nextWinnerEmail, nextPlayers);
+};
 
 // Game callback fns
 // These are used as callbacks from the Game object's state.
@@ -163,8 +177,12 @@ const dispatchGameRules = async (socket) => {
   socket.emit('gameRules', rules[0]);
 };
 
-// Instantiate the class
+// Instantiate the Game
 const game = new Game(presenceCb, propogateScores);
+
+// Instantiate the Standup
+const standUp = new Standup(refreshWheel, spinWheel);
+console.log('New StandUp instantiated.');
 
 // A new client connection request received
 io.on('connection', function (socket) {
@@ -219,6 +237,7 @@ io.on('connection', function (socket) {
     const gameId = data[0].id;
 
     const savedGame = { ...newGame, gameId, category: newCategory };
+    console.log('savedGame: ', savedGame);
 
     game.setGame(savedGame);
 
@@ -242,6 +261,9 @@ io.on('connection', function (socket) {
   // On category select, start the game and dispatch the question
   socket.on('category', async (name, newCategory) => {
     handleNewGame(name, newCategory);
+    // Additionally handle a spin on the standup so that the next spinner can be queued
+    console.log('handling spin');
+    standUp.handleSpin();
   });
 
   socket.on('refreshGame', async (name, newCategory) => {
@@ -281,6 +303,9 @@ io.on('connection', function (socket) {
 
     const players = game.setPlayer(email, playerData);
     io.emit('players', players);
+
+    // Add to standUp (wip)
+    standUp.joinStandup(email, playerData);
 
     // Additionally check for latest game status
     const existingGame = game.getGame();
@@ -350,6 +375,16 @@ io.on('connection', function (socket) {
     dispatchUserCategories();
   });
 
+  socket.on('handleSpin', () => {
+    console.log('handling spin');
+    standUp.handleSpin();
+  });
+
+  socket.on('kickOff', (name) => {
+    const players = game.getPlayers();
+    const newPlayers = players.filter((x) => x.name !== name);
+  });
+
   socket.on('disconnect', (reason) => {
     // players = players.filter((x) => x.socketId !== socket.id);
     // players[socket.id] = null;
@@ -359,7 +394,20 @@ io.on('connection', function (socket) {
   });
 });
 
-// app.listen(port, () => console.log(`express listening on port ${port}`));
+app.listen(port, () => console.log(`express listening on port ${port}`));
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+    // delete cookies on sign out
+    const expires = new Date(0).toUTCString();
+    document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+  } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
+    document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+  }
+});
 
 app.get('/categories', async (req, res) => {
   const { data: categories, error: userDataError } = await supabase
@@ -377,6 +425,36 @@ app.post('/addCategory', async (req, res) => {
     .select();
 
   res.send('Adding category');
+});
+
+app.get('/notes', async (req, res) => {
+  // const user = supabase.auth.user();
+  // console.log('user: ', user);
+  let { data, error, status } = await supabase
+    .from('notes')
+    .select()
+    .eq('id', user.id);
+});
+
+app.post('/addNote', async (req, res) => {
+  console.log('req.body: ', req.body);
+  const user = supabase.auth.user();
+  const { category, created_by } = req.body;
+  // const { data: newCategory, error: userDataError } = await supabase
+  //   .from('categories')
+  //   .insert({ category, created_by })
+  //   .select();
+
+  res.send('Adding note');
+});
+
+app.get('/picks', async (req, res) => {
+  // const user = supabase.auth.user();
+  // console.log('user: ', user);
+  let { data, error, status } = await supabase
+    .from('notes')
+    .select()
+    .eq('id', user.id);
 });
 
 app.get('/', (req, res) => {

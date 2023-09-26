@@ -1,27 +1,36 @@
-const { Configuration, OpenAIApi } = require('openai');
+// const { Configuration, OpenAIApi } = require('openai');
+// import OpenAI from 'openai';
+const OpenAI = require('openai');
 
 const openAiKey = process.env.OPENAI_API_KEY;
 console.log('openAiKey: ', openAiKey);
 
-const configuration = new Configuration({
-  apiKey: openAiKey,
+// const configuration = new Configuration({
+//   apiKey: openAiKey,
+// });
+// const openai = new OpenAIApi(configuration);
+
+const openai = new OpenAI({
+  apiKey: openAiKey, // defaults to process.env["OPENAI_API_KEY"]
 });
-const openai = new OpenAIApi(configuration);
 
 const newGamePrompt = (category) => {
-  return `You can only respond in JSON format. Generate an interesting trivia question on the topic of ${category}, returning 4 possible answers under the property "options" along with whether each option is correct using a boolean property "isAnswer". Each option is in the format of "{ option, isAnswer }". Only one answer can be correct. The trivia question should be returned on the property "question". Additionally, provide a 2-3 sentence explanation for the answer using the property "answerContext". Also, add a property called "keywords" and provide 1 sentence explaining the answer. Remove all line breaks from the json response and do not add a prefix to the json. Do not stringify the json. Make sure the json string is wrapped in brackets.`;
+  return `You can only respond in JSON format. Generate an interesting trivia question on the subject of ${category}, returning 4 possible answers under the property "options". Each option should have a boolean property "isAnswer". Each option should have a property "option". Only one answer can be correct. The trivia question should be returned on the property "question". Additionally, provide a 2-3 sentence explanation for the answer using the property "answerContext". Also, add a property called "keywords" and provide 1 sentence explaining the answer. Remove all line breaks from the json response and do not add a prefix to the json. Do not stringify the json. Make sure the json result is an object.`;
 };
 
 const newGame = async (category) => {
   try {
     const prompt = newGamePrompt(category);
-    const completion = await openai.createCompletion({
-      model: 'text-davinci-003',
-      prompt,
+    const completion = await openai.chat.completions.create({
+      // model: 'text-davinci-003',
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      // prompt,
       max_tokens: 800,
       temperature: 1.3,
     });
-    let result = completion.data.choices[0].text
+    console.log('completion: ', completion);
+    let result = completion.choices[0].message.content
       .trim()
       .replace(/(\r\n|\n|\r)/gm, '');
     // Sometimes it uses a For example: in the response
@@ -35,10 +44,15 @@ const newGame = async (category) => {
     const resp = JSON.parse(result);
     console.log('resp: ', resp);
 
+    if (Array.isArray(resp)) {
+      return resp[0];
+    }
+
     return resp;
   } catch (e) {
-    console.log('an error occurred, try again');
+    console.log('an error occurred, try again', e);
     // return e;
+    debugger;
     if (category) {
       return newGame(category);
     }
