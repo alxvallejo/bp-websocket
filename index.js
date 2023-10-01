@@ -53,9 +53,9 @@ const refreshWheel = (players, selectedSpinner) => {
   io.emit('refreshWheel', players, selectedSpinner);
 };
 
-const spinWheel = (nextWinnerEmail, nextPlayers) => {
+const spinWheel = (nextWinnerEmail, nextPlayers, currentSpinner) => {
   console.log('spinning wheel');
-  io.emit('spinResults', nextWinnerEmail, nextPlayers);
+  io.emit('spinResults', nextWinnerEmail, nextPlayers, currentSpinner);
 };
 
 // Game callback fns
@@ -174,7 +174,10 @@ const dispatchGameRules = async (socket) => {
     .from('rules')
     .select()
     .limit(1);
-  socket.emit('gameRules', rules[0]);
+  if (rules) {
+    console.log('rules: ', rules);
+    socket.emit('gameRules', rules[0]);
+  }
 };
 
 // Instantiate the Game

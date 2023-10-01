@@ -63,13 +63,14 @@ class Standup {
   };
 
   handleSpin = () => {
-    let newPlayers, newPlayerEmails;
+    let newPlayers, newPlayerEmails, currentSpinner;
     if (!this.selectedSpinner) {
       console.log('no selected spinner, return same array');
       // New game
       newPlayers = this.getPlayers();
       newPlayerEmails = this.getPlayerEmails();
     } else {
+      currentSpinner = this.selectedSpinner?.email;
       console.log(`Removing ${this.selectedSpinner?.email}`);
       // Remove this player
       newPlayers = this.removePlayer(this.selectedSpinner?.email);
@@ -84,7 +85,7 @@ class Standup {
 
     console.log('randomWinner: ', randomWinner);
     // Return winner + new list
-    this.spinWheel(randomWinner, newPlayers);
+    this.spinWheel(randomWinner, newPlayers, currentSpinner);
   };
 }
 
