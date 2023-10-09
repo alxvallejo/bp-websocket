@@ -69,12 +69,46 @@ const getFunctions = () => {
 // };
 
 const newGamePrompt = (subject) => {
-  return `Given the topic ${subject}, generate an interesting trivia question along with 4 possible answers and provide some context on the answer.`;
+  return `Given the topic ${subject}, generate a random trivia question that is fun and interesting along with 4 possible answers and provide some context on the answer.`;
+};
+
+const tryAgain = async (category) => {
+  try {
+    const prompt = `Pick a different trivia question on the topic of ${category}.`;
+    console.log(`Trying again for ${category}...`);
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 800,
+      temperature: 1.7,
+      functions: getFunctions(),
+    });
+    console.log('completion: ', completion);
+    let result = completion.choices[0].message.function_call?.arguments
+      .trim()
+      .replace(/(\r\n|\n|\r)/gm, '');
+    console.log('result: ', result);
+    if (Object.keys(result).length === 0) {
+      return newGame(category);
+    }
+    const resp = JSON.parse(result);
+    console.log('resp: ', resp);
+    if (Array.isArray(resp)) {
+      return resp[0];
+    }
+    return resp;
+  } catch (e) {
+    console.log('an error occurred, try again', e);
+    if (category) {
+      return newGame(category);
+    }
+  }
 };
 
 const newGame = async (category) => {
   try {
     const prompt = newGamePrompt(category);
+    console.log(`Looking up new completion for ${category}...`);
     const completion = await openai.chat.completions.create({
       // model: 'text-davinci-003',
       // model: 'gpt-4',
@@ -82,7 +116,7 @@ const newGame = async (category) => {
       messages: [{ role: 'user', content: prompt }],
       // prompt,
       max_tokens: 800,
-      temperature: 0,
+      temperature: 1.7,
       functions: getFunctions(),
     });
     console.log('completion: ', completion);
@@ -139,5 +173,6 @@ const parseForPlayer = (resp) => {
 
 module.exports = {
   newGame,
+  tryAgain,
   parseForPlayer,
 };

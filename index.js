@@ -383,6 +383,16 @@ io.on('connection', function (socket) {
     standUp.handleSpin();
   });
 
+  socket.on('tryAgain', async (category) => {
+    const newGame = await openAi.tryAgain(category);
+    console.log('newGame: ', newGame);
+    let savedGame = { ...newGame, category };
+    game.setGame(savedGame);
+    const parsed = openAi.parseForPlayer(savedGame);
+    console.log('Emitting parsed game: ', parsed);
+    io.emit('newGame', parsed);
+  });
+
   socket.on('kickOff', (name) => {
     const players = game.getPlayers();
     const newPlayers = players.filter((x) => x.name !== name);
