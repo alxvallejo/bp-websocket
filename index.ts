@@ -45,7 +45,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
-let timeoutId;
+let timeoutId: NodeJS.Timeout;
 
 // StandupService callback fns
 
@@ -167,14 +167,14 @@ const dispatchUserCategories = async () => {
   io.emit('userCategories', userCategories);
 };
 
-const dispatchMyCategories = async (socket) => {
+const dispatchMyCategories = async (socket: any) => {
   const { data: userCategories, error: getCatsError } = await supabase
     .from('categories')
     .select();
   socket.emit('userCategories', userCategories);
 };
 
-const dispatchGameRules = async (socket) => {
+const dispatchGameRules = async (socket: any) => {
   // Get game rules
   const { data: rules, error: rulesError } = await supabase
     .from('rules')
@@ -194,7 +194,7 @@ const standUp = new StandupService(refreshWheel, spinWheel);
 console.log('New StandUp instantiated.');
 
 // A new client connection request received
-io.on('connection', function (socket) {
+io.on('connection', function (socket: any) {
   console.log(`Recieved a new connection.`);
   socket.emit('message', `You are socket ${socket.id}`);
 
@@ -360,7 +360,7 @@ io.on('connection', function (socket) {
     io.emit('resetGame', `${email} reset the game!`);
   });
 
-  socket.on('editMinPlayers', async (newMinPlayers) => {
+  socket.on('editMinPlayers', async (newMinPlayers: number) => {
     const { data: rules, error: rulesError } = await supabase
       .from('rules')
       .update({ min_players: newMinPlayers })
@@ -402,7 +402,7 @@ io.on('connection', function (socket) {
 
   socket.on('kickOff', (name: string) => {
     const players = game.getPlayers();
-    const newPlayers = players.filter((x) => x.name !== name);
+    const newPlayers = players.filter((x: Player) => x.name !== name);
   });
 
   socket.on('disconnect', (reason: string) => {
@@ -416,68 +416,85 @@ io.on('connection', function (socket) {
 
 app.listen(port, () => console.log(`express listening on port ${port}`));
 
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-    // delete cookies on sign out
-    const expires = new Date(0).toUTCString();
-    document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
-    document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
-  } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
-    document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
-    document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+supabase.auth.onAuthStateChange(
+  (event: string, session: { access_token: any; refresh_token: any }) => {
+    if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+      // delete cookies on sign out
+      const expires = new Date(0).toUTCString();
+      document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+      document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+    } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
+      document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+      document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+    }
   }
-});
+);
 
-app.get('/categories', async (req, res) => {
-  const { data: categories, error: userDataError } = await supabase
-    .from('categories')
-    .select();
-  res.send(JSON.stringify(categories));
-});
+app.get(
+  '/categories',
+  async (req: any, res: { send: (arg0: string) => void }) => {
+    const { data: categories, error: userDataError } = await supabase
+      .from('categories')
+      .select();
+    res.send(JSON.stringify(categories));
+  }
+);
 
-app.post('/addCategory', async (req, res) => {
-  console.log('req.body: ', req.body);
-  const { category, created_by } = req.body;
-  const { data: newCategory, error: userDataError } = await supabase
-    .from('categories')
-    .insert({ category, created_by })
-    .select();
+app.post(
+  '/addCategory',
+  async (
+    req: { body: { category: any; created_by: any } },
+    res: { send: (arg0: string) => void }
+  ) => {
+    console.log('req.body: ', req.body);
+    const { category, created_by } = req.body;
+    const { data: newCategory, error: userDataError } = await supabase
+      .from('categories')
+      .insert({ category, created_by })
+      .select();
 
-  res.send('Adding category');
-});
+    res.send('Adding category');
+  }
+);
 
-app.get('/notes', async (req, res) => {
-  // const user = supabase.auth.user();
-  // console.log('user: ', user);
-  let { data, error, status } = await supabase
-    .from('notes')
-    .select()
-    .eq('id', user.id);
-});
+// app.get('/notes', async (req: any, res: any) => {
+//   // const user = supabase.auth.user();
+//   // console.log('user: ', user);
+//   let { data, error, status } = await supabase
+//     .from('notes')
+//     .select()
+//     .eq('id', user.id);
+// });
 
-app.post('/addNote', async (req, res) => {
-  console.log('req.body: ', req.body);
-  const user = supabase.auth.user();
-  const { category, created_by } = req.body;
-  // const { data: newCategory, error: userDataError } = await supabase
-  //   .from('categories')
-  //   .insert({ category, created_by })
-  //   .select();
+app.post(
+  '/addNote',
+  async (
+    req: { body: { category: any; created_by: any } },
+    res: { send: (arg0: string) => void }
+  ) => {
+    console.log('req.body: ', req.body);
+    const user = supabase.auth.user();
+    const { category, created_by } = req.body;
+    // const { data: newCategory, error: userDataError } = await supabase
+    //   .from('categories')
+    //   .insert({ category, created_by })
+    //   .select();
 
-  res.send('Adding note');
-});
+    res.send('Adding note');
+  }
+);
 
-app.get('/picks', async (req, res) => {
-  // const user = supabase.auth.user();
-  // console.log('user: ', user);
-  let { data, error, status } = await supabase
-    .from('notes')
-    .select()
-    .eq('id', user.id);
-});
+// app.get('/picks', async (req: any, res: any) => {
+//   // const user = supabase.auth.user();
+//   // console.log('user: ', user);
+//   let { data, error, status } = await supabase
+//     .from('notes')
+//     .select()
+//     .eq('id', user.id);
+// });
 
-app.get('/', (req, res) => {
+app.get('/', (req: any, res: { send: (arg0: string) => void }) => {
   res.send('Hello world');
 });
 

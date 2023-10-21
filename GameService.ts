@@ -2,7 +2,7 @@ import { PlayerAnswer, Game, AnswerImg, Player, Option } from './types';
 
 class GameService {
   playerPresence: () => void;
-  propogateScores: (players: Player[]) => void;
+  propogateScores: (players: (Player | null)[]) => void;
   players: { [email: string]: Player | null };
   playerAnswers: PlayerAnswer[] | null;
   category: string | null;
@@ -93,7 +93,7 @@ class GameService {
     return this.answerContext;
   };
 
-  setAnswerImg = (image, keywords) => {
+  setAnswerImg = (image: string, keywords: string) => {
     this.answerImg = {
       image,
       keywords,
@@ -133,10 +133,14 @@ class GameService {
       return this.players;
     }
     // Loop through player answers and update the players object with `isCorrect`
-    this.playerAnswers.map((player, i) => {
-      const isCorrect = this.correctAnswer.option == player.answer;
+    this.playerAnswers?.map((player, i) => {
+      const isCorrect = this.correctAnswer?.option == player.answer;
       const email = player.email;
-      this.players[email]['isCorrect'] = isCorrect;
+      let p = this.players?.[email];
+      if (p) {
+        let newP = { ...p, isCorrect };
+        this.players[email] = newP;
+      }
     });
     return this.getPlayers();
   };

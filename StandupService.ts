@@ -1,16 +1,19 @@
 import { Player } from './types';
 
+type RefreshWheel = (players: Player[], playerData: Player) => void;
+type SpinWheel = (
+  nextWinnerEmail: string,
+  nextPlayers: Player[],
+  currentSpinner: string
+) => void;
+
 class StandupService {
   players: { [email: string]: Player };
   selectedSpinner: Player | null;
-  refreshWheel: (players: Player[], playerData: Player) => void;
-  spinWheel: (
-    nextWinnerEmail: string,
-    nextPlayers: Player[],
-    currentSpinner: string
-  ) => void;
+  refreshWheel: RefreshWheel;
+  spinWheel: SpinWheel;
 
-  constructor(refreshWheel, spinWheel) {
+  constructor(refreshWheel: RefreshWheel, spinWheel: SpinWheel) {
     this.players = {};
     this.selectedSpinner = null;
     this.refreshWheel = refreshWheel;

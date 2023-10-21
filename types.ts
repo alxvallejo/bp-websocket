@@ -18,6 +18,7 @@ export type Player = {
   name: string;
   playerData: PlayerData;
   socketId: string;
+  isCorrect: boolean;
 };
 
 export type PlayerAnswer = {
@@ -60,3 +61,34 @@ export type Standup = {
   nextWinnerEmail: string;
   players: Player[];
 };
+
+/**
+ * Socket.io
+ */
+
+// export type Socket = {
+//   on(
+//     arg0: any
+//   ): unknown;
+//   removeAllListeners(): unknown;
+//   id: string;
+//   emit: (arg0: string, arg1: any) => void;
+// };
+export interface ServerToClientEvents {
+  noArg: () => void;
+  basicEmit: (a: number, b: string, c: Buffer) => void;
+  withAck: (d: string, callback: (e: number) => void) => void;
+}
+
+export interface ClientToServerEvents {
+  hello: () => void;
+}
+
+export interface InterServerEvents {
+  ping: () => void;
+}
+
+export interface SocketData {
+  name: string;
+  age: number;
+}
