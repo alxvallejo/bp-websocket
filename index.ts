@@ -1,3 +1,5 @@
+import { Player, UserData } from './types';
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -5,7 +7,8 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
-const { Game } = require('./Game');
+const { GameService } = require('./GameService');
+const { StandupService } = require('./StandupService');
 
 const app = express();
 const server = http.createServer(app);
@@ -44,15 +47,32 @@ app.use(bodyParser.json());
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
 let timeoutId;
 
-// Game callback fns
-// These are used as callbacks from the Game object's state.
+// StandupService callback fns
 
-const presenceCb = (players) => {
+// Emit the next set of players including the selectedSpinner
+const refreshWheel = (players: Player[], selectedSpinner: Player) => {
+  console.log('refreshing wheel');
+  io.emit('refreshWheel', players, selectedSpinner);
+};
+
+const spinWheel = (
+  nextWinnerEmail: string,
+  nextPlayers: Player[],
+  currentSpinner: string
+) => {
+  console.log('spinning wheel');
+  io.emit('spinResults', nextWinnerEmail, nextPlayers, currentSpinner);
+};
+
+// GameService callback fns
+// These are used as callbacks from the GameService object's state.
+
+const presenceCb = (players: Player[]) => {
   console.log('broadcasting player list', players);
   io.emit('players', players);
 };
 
-const propogateScores = async (players) => {
+const propogateScores = async (players: Player[]) => {
   console.log('propogating scores');
   // If all players have answered, start a timeout and then emit the answer
   const unanswered = players.filter((x) => !x.answered);
@@ -160,11 +180,18 @@ const dispatchGameRules = async (socket) => {
     .from('rules')
     .select()
     .limit(1);
-  socket.emit('gameRules', rules[0]);
+  if (rules) {
+    console.log('rules: ', rules);
+    socket.emit('gameRules', rules[0]);
+  }
 };
 
-// Instantiate the class
-const game = new Game(presenceCb, propogateScores);
+// Instantiate the GameService
+const game = new GameService(presenceCb, propogateScores);
+
+// Instantiate the StandupService
+const standUp = new StandupService(refreshWheel, spinWheel);
+console.log('New StandUp instantiated.');
 
 // A new client connection request received
 io.on('connection', function (socket) {
@@ -188,7 +215,7 @@ io.on('connection', function (socket) {
   dispatchMyCategories(socket);
   dispatchGameRules(socket);
 
-  const handleNewGame = async (name, newCategory) => {
+  const handleNewGame = async (name: string, newCategory: string) => {
     console.log('newCategory: ', newCategory);
 
     const existingCategory = game.getCategory();
@@ -219,6 +246,7 @@ io.on('connection', function (socket) {
     const gameId = data[0].id;
 
     const savedGame = { ...newGame, gameId, category: newCategory };
+    console.log('savedGame: ', savedGame);
 
     game.setGame(savedGame);
 
@@ -240,16 +268,19 @@ io.on('connection', function (socket) {
   };
 
   // On category select, start the game and dispatch the question
-  socket.on('category', async (name, newCategory) => {
+  socket.on('category', async (name: string, newCategory: string) => {
     handleNewGame(name, newCategory);
+    // Additionally handle a spin on the standup so that the next spinner can be queued
+    console.log('handling spin');
+    standUp.handleSpin();
   });
 
-  socket.on('refreshGame', async (name, newCategory) => {
+  socket.on('refreshGame', async (name: string, newCategory: string) => {
     console.log(`${name} refreshed the game`);
     handleNewGame(name, newCategory);
   });
 
-  socket.on('answer', (email, answer) => {
+  socket.on('answer', (email: string, answer: string) => {
     console.log('email: ', email);
     console.log('answer: ', answer);
 
@@ -258,7 +289,7 @@ io.on('connection', function (socket) {
     io.emit('players', players);
   });
 
-  socket.on('signIn', async (userData) => {
+  socket.on('signIn', async (userData: UserData) => {
     console.log('userData on SignIn: ', userData);
     socket.emit('message', `${userData.email} Joining room ${roomName}`);
     const email = userData.email;
@@ -268,6 +299,7 @@ io.on('connection', function (socket) {
       name,
       email,
       answered: false,
+      playerData: {},
     };
 
     // Grab scores from supabase
@@ -281,6 +313,9 @@ io.on('connection', function (socket) {
 
     const players = game.setPlayer(email, playerData);
     io.emit('players', players);
+
+    // Add to standUp (wip)
+    standUp.joinStandup(email, playerData);
 
     // Additionally check for latest game status
     const existingGame = game.getGame();
@@ -315,12 +350,12 @@ io.on('connection', function (socket) {
     socket.emit('playerStats', playerStats);
   });
 
-  socket.on('signOut', (email) => {
+  socket.on('signOut', (email: string) => {
     console.log('email: ', email);
     console.log('socket id on signout', socket.id);
   });
 
-  socket.on('resetGame', (email) => {
+  socket.on('resetGame', (email: string) => {
     game.reset();
     io.emit('resetGame', `${email} reset the game!`);
   });
@@ -334,7 +369,7 @@ io.on('connection', function (socket) {
     io.emit('gameRules', rules[0]);
   });
 
-  socket.on('addCategory', async (category, created_by) => {
+  socket.on('addCategory', async (category: string, created_by: string) => {
     const { data: newCategory, error: newCatError } = await supabase
       .from('categories')
       .insert({ name: category, created_by })
@@ -342,7 +377,7 @@ io.on('connection', function (socket) {
     dispatchUserCategories();
   });
 
-  socket.on('deleteCategory', async (categoryId) => {
+  socket.on('deleteCategory', async (categoryId: string) => {
     const { data: newCategory, error: newCatError } = await supabase
       .from('categories')
       .delete()
@@ -350,7 +385,27 @@ io.on('connection', function (socket) {
     dispatchUserCategories();
   });
 
-  socket.on('disconnect', (reason) => {
+  socket.on('handleSpin', () => {
+    console.log('handling spin');
+    standUp.handleSpin();
+  });
+
+  socket.on('tryAgain', async (category: string) => {
+    const newGame = await openAi.tryAgain(category);
+    console.log('newGame: ', newGame);
+    let savedGame = { ...newGame, category };
+    game.setGame(savedGame);
+    const parsed = openAi.parseForPlayer(savedGame);
+    console.log('Emitting parsed game: ', parsed);
+    io.emit('newGame', parsed);
+  });
+
+  socket.on('kickOff', (name: string) => {
+    const players = game.getPlayers();
+    const newPlayers = players.filter((x) => x.name !== name);
+  });
+
+  socket.on('disconnect', (reason: string) => {
     // players = players.filter((x) => x.socketId !== socket.id);
     // players[socket.id] = null;
     console.log('disconnecting', socket.id);
@@ -359,7 +414,20 @@ io.on('connection', function (socket) {
   });
 });
 
-// app.listen(port, () => console.log(`express listening on port ${port}`));
+app.listen(port, () => console.log(`express listening on port ${port}`));
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+    // delete cookies on sign out
+    const expires = new Date(0).toUTCString();
+    document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+  } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+    const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
+    document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+  }
+});
 
 app.get('/categories', async (req, res) => {
   const { data: categories, error: userDataError } = await supabase
@@ -377,6 +445,36 @@ app.post('/addCategory', async (req, res) => {
     .select();
 
   res.send('Adding category');
+});
+
+app.get('/notes', async (req, res) => {
+  // const user = supabase.auth.user();
+  // console.log('user: ', user);
+  let { data, error, status } = await supabase
+    .from('notes')
+    .select()
+    .eq('id', user.id);
+});
+
+app.post('/addNote', async (req, res) => {
+  console.log('req.body: ', req.body);
+  const user = supabase.auth.user();
+  const { category, created_by } = req.body;
+  // const { data: newCategory, error: userDataError } = await supabase
+  //   .from('categories')
+  //   .insert({ category, created_by })
+  //   .select();
+
+  res.send('Adding note');
+});
+
+app.get('/picks', async (req, res) => {
+  // const user = supabase.auth.user();
+  // console.log('user: ', user);
+  let { data, error, status } = await supabase
+    .from('notes')
+    .select()
+    .eq('id', user.id);
 });
 
 app.get('/', (req, res) => {
