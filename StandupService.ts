@@ -1,17 +1,28 @@
-class Standup {
+import { Player } from './types';
+
+class StandupService {
+  players: { [email: string]: Player };
+  selectedSpinner: Player | null;
+  refreshWheel: (players: Player[], playerData: Player) => void;
+  spinWheel: (
+    nextWinnerEmail: string,
+    nextPlayers: Player[],
+    currentSpinner: string
+  ) => void;
+
   constructor(refreshWheel, spinWheel) {
-    this.players = null;
+    this.players = {};
     this.selectedSpinner = null;
     this.refreshWheel = refreshWheel;
     this.spinWheel = spinWheel;
   }
 
   reset = () => {
-    this.players = null;
+    this.players = {};
     this.selectedSpinner = null;
   };
 
-  getPlayers = () => {
+  getPlayers = (): Player[] => {
     if (!this.players) {
       return [];
     }
@@ -25,27 +36,20 @@ class Standup {
     return Object.keys(this.players);
   };
 
-  setPlayer = (email, playerData) => {
-    // let players = this.players || {
-    //   bowpourri: {
-    //     email: null,
-    //     name: 'bowpourri',
-    //   },
-    // };
+  setPlayer = (email: string, playerData: Player) => {
     let players = this.players || [];
     players[email] = playerData;
     this.players = players;
-    // return Object.values(players);
   };
 
-  removePlayer = (email) => {
+  removePlayer = (email: string) => {
     let players = this.players || {};
     delete players[email];
     this.players = players;
     return this.getPlayers();
   };
 
-  joinStandup = (email, playerData) => {
+  joinStandup = (email: string, playerData: Player) => {
     let players;
     if (!this.selectedSpinner) {
       console.log('starting new standup - no selected spinner', email);
@@ -63,14 +67,16 @@ class Standup {
   };
 
   handleSpin = () => {
-    let newPlayers, newPlayerEmails, currentSpinner;
+    let newPlayers: Player[],
+      newPlayerEmails: string[],
+      currentSpinner: string = '';
     if (!this.selectedSpinner) {
       console.log('no selected spinner, return same array');
       // New game
       newPlayers = this.getPlayers();
       newPlayerEmails = this.getPlayerEmails();
     } else {
-      currentSpinner = this.selectedSpinner?.email;
+      currentSpinner = this.selectedSpinner?.email || '';
       console.log(`Removing ${this.selectedSpinner?.email}`);
       // Remove this player
       newPlayers = this.removePlayer(this.selectedSpinner?.email);
@@ -81,7 +87,9 @@ class Standup {
     const randomIndex = Math.floor(Math.random() * newPlayerEmails.length);
     const randomWinner = newPlayerEmails[randomIndex];
 
-    this.selectedSpinner = this.players[randomWinner];
+    if (randomWinner) {
+      this.selectedSpinner = this.players[randomWinner];
+    }
 
     console.log('randomWinner: ', randomWinner);
     // Return winner + new list
@@ -90,5 +98,5 @@ class Standup {
 }
 
 module.exports = {
-  Standup,
+  StandupService,
 };

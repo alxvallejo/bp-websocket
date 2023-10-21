@@ -1,23 +1,31 @@
-class Game {
-  constructor(presenceCb, propogateScores) {
+import { PlayerAnswer, Game, AnswerImg, Player, Option } from './types';
+
+class GameService {
+  playerPresence: () => void;
+  propogateScores: (players: Player[]) => void;
+  players: { [email: string]: Player | null };
+  playerAnswers: PlayerAnswer[] | null;
+  category: string | null;
+  newGame: Game | null;
+  correctAnswer: Option | undefined | null;
+  answerImg: AnswerImg | null;
+  answerContext: string | null;
+  keywords: string | null;
+
+  constructor(presenceCb: () => void, propogateScores: () => void) {
     this.playerPresence = presenceCb;
     this.propogateScores = propogateScores;
     this.players = {};
     this.playerAnswers = null;
     this.category = null;
     this.newGame = null;
-    this.correctAnswer = null;
+    this.correctAnswer = undefined;
     this.answerImg = null;
     this.answerContext = null;
     this.keywords = null;
   }
 
   reset = () => {
-    // this.players = Object.keys(this.players.length) > 0 ? (
-    //   Object.keys(this.players).map(email => {
-    //     this.players[email] = Object
-    //   })
-    // ) : {};
     this.playerAnswers = null;
     this.category = null;
     this.newGame = null;
@@ -33,24 +41,24 @@ class Game {
     return players;
   };
 
-  setPlayer = (email, playerData) => {
+  setPlayer = (email: string, player: Player) => {
     let players = this.players || {};
-    players[email] = playerData;
+    players[email] = player;
     this.players = players;
     return this.getPlayers();
   };
 
-  removePlayer = (email) => {
+  removePlayer = (email: string) => {
     let players = this.players || {};
     players[email] = null;
     this.players = players;
   };
 
-  getPlayer = (email) => {
+  getPlayer = (email: string) => {
     return this.players[email];
   };
 
-  setCategory = (category) => {
+  setCategory = (category: string) => {
     this.category = category;
   };
 
@@ -58,7 +66,7 @@ class Game {
     return this.category;
   };
 
-  setGame = (newGame) => {
+  setGame = (newGame: Game) => {
     if (!newGame || !newGame.options) {
       return;
     }
@@ -73,7 +81,7 @@ class Game {
     return this.newGame;
   };
 
-  setAnswer = (answer) => {
+  setAnswer = (answer: Option) => {
     this.correctAnswer = answer;
   };
 
@@ -96,13 +104,13 @@ class Game {
     return this.answerImg;
   };
 
-  setPlayerAnswer = (email, answer) => {
+  setPlayerAnswer = (email: string, answer: string) => {
     let playerAnswers = this.playerAnswers || [];
     playerAnswers = [...playerAnswers, { email, answer }];
     this.playerAnswers = playerAnswers;
   };
 
-  submitAnswer = (email, answer) => {
+  submitAnswer = (email: string, answer: string) => {
     if (!this.newGame) {
       return;
     }
@@ -135,5 +143,5 @@ class Game {
 }
 
 module.exports = {
-  Game,
+  GameService,
 };

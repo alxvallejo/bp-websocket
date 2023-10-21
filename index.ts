@@ -1,3 +1,5 @@
+import { Player, UserData } from './types';
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -5,8 +7,8 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
-const { Game } = require('./Game');
-const { Standup } = require('./Standup');
+const { GameService } = require('./GameService');
+const { StandupService } = require('./StandupService');
 
 const app = express();
 const server = http.createServer(app);
@@ -45,28 +47,32 @@ app.use(bodyParser.json());
 const ANSWER_BUFFER = 5; // After last player answers, provide a buffer to change answer
 let timeoutId;
 
-// Standup callback fns
+// StandupService callback fns
 
 // Emit the next set of players including the selectedSpinner
-const refreshWheel = (players, selectedSpinner) => {
+const refreshWheel = (players: Player[], selectedSpinner: Player) => {
   console.log('refreshing wheel');
   io.emit('refreshWheel', players, selectedSpinner);
 };
 
-const spinWheel = (nextWinnerEmail, nextPlayers, currentSpinner) => {
+const spinWheel = (
+  nextWinnerEmail: string,
+  nextPlayers: Player[],
+  currentSpinner: string
+) => {
   console.log('spinning wheel');
   io.emit('spinResults', nextWinnerEmail, nextPlayers, currentSpinner);
 };
 
-// Game callback fns
-// These are used as callbacks from the Game object's state.
+// GameService callback fns
+// These are used as callbacks from the GameService object's state.
 
-const presenceCb = (players) => {
+const presenceCb = (players: Player[]) => {
   console.log('broadcasting player list', players);
   io.emit('players', players);
 };
 
-const propogateScores = async (players) => {
+const propogateScores = async (players: Player[]) => {
   console.log('propogating scores');
   // If all players have answered, start a timeout and then emit the answer
   const unanswered = players.filter((x) => !x.answered);
@@ -180,11 +186,11 @@ const dispatchGameRules = async (socket) => {
   }
 };
 
-// Instantiate the Game
-const game = new Game(presenceCb, propogateScores);
+// Instantiate the GameService
+const game = new GameService(presenceCb, propogateScores);
 
-// Instantiate the Standup
-const standUp = new Standup(refreshWheel, spinWheel);
+// Instantiate the StandupService
+const standUp = new StandupService(refreshWheel, spinWheel);
 console.log('New StandUp instantiated.');
 
 // A new client connection request received
@@ -209,7 +215,7 @@ io.on('connection', function (socket) {
   dispatchMyCategories(socket);
   dispatchGameRules(socket);
 
-  const handleNewGame = async (name, newCategory) => {
+  const handleNewGame = async (name: string, newCategory: string) => {
     console.log('newCategory: ', newCategory);
 
     const existingCategory = game.getCategory();
@@ -262,19 +268,19 @@ io.on('connection', function (socket) {
   };
 
   // On category select, start the game and dispatch the question
-  socket.on('category', async (name, newCategory) => {
+  socket.on('category', async (name: string, newCategory: string) => {
     handleNewGame(name, newCategory);
     // Additionally handle a spin on the standup so that the next spinner can be queued
     console.log('handling spin');
     standUp.handleSpin();
   });
 
-  socket.on('refreshGame', async (name, newCategory) => {
+  socket.on('refreshGame', async (name: string, newCategory: string) => {
     console.log(`${name} refreshed the game`);
     handleNewGame(name, newCategory);
   });
 
-  socket.on('answer', (email, answer) => {
+  socket.on('answer', (email: string, answer: string) => {
     console.log('email: ', email);
     console.log('answer: ', answer);
 
@@ -283,7 +289,7 @@ io.on('connection', function (socket) {
     io.emit('players', players);
   });
 
-  socket.on('signIn', async (userData) => {
+  socket.on('signIn', async (userData: UserData) => {
     console.log('userData on SignIn: ', userData);
     socket.emit('message', `${userData.email} Joining room ${roomName}`);
     const email = userData.email;
@@ -293,6 +299,7 @@ io.on('connection', function (socket) {
       name,
       email,
       answered: false,
+      playerData: {},
     };
 
     // Grab scores from supabase
@@ -343,12 +350,12 @@ io.on('connection', function (socket) {
     socket.emit('playerStats', playerStats);
   });
 
-  socket.on('signOut', (email) => {
+  socket.on('signOut', (email: string) => {
     console.log('email: ', email);
     console.log('socket id on signout', socket.id);
   });
 
-  socket.on('resetGame', (email) => {
+  socket.on('resetGame', (email: string) => {
     game.reset();
     io.emit('resetGame', `${email} reset the game!`);
   });
@@ -362,7 +369,7 @@ io.on('connection', function (socket) {
     io.emit('gameRules', rules[0]);
   });
 
-  socket.on('addCategory', async (category, created_by) => {
+  socket.on('addCategory', async (category: string, created_by: string) => {
     const { data: newCategory, error: newCatError } = await supabase
       .from('categories')
       .insert({ name: category, created_by })
@@ -370,7 +377,7 @@ io.on('connection', function (socket) {
     dispatchUserCategories();
   });
 
-  socket.on('deleteCategory', async (categoryId) => {
+  socket.on('deleteCategory', async (categoryId: string) => {
     const { data: newCategory, error: newCatError } = await supabase
       .from('categories')
       .delete()
@@ -383,7 +390,7 @@ io.on('connection', function (socket) {
     standUp.handleSpin();
   });
 
-  socket.on('tryAgain', async (category) => {
+  socket.on('tryAgain', async (category: string) => {
     const newGame = await openAi.tryAgain(category);
     console.log('newGame: ', newGame);
     let savedGame = { ...newGame, category };
@@ -393,12 +400,12 @@ io.on('connection', function (socket) {
     io.emit('newGame', parsed);
   });
 
-  socket.on('kickOff', (name) => {
+  socket.on('kickOff', (name: string) => {
     const players = game.getPlayers();
     const newPlayers = players.filter((x) => x.name !== name);
   });
 
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', (reason: string) => {
     // players = players.filter((x) => x.socketId !== socket.id);
     // players[socket.id] = null;
     console.log('disconnecting', socket.id);
