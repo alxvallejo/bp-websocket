@@ -68,11 +68,11 @@ const getFunctions = () => {
 //   return `You can only respond in JSON format with no line breaks and no text before the JSON. All answers must be in English. Generate an interesting trivia question on the subject of ${category}, returning 4 possible answers under the property "options". Each option should have a boolean property "isAnswer". Each option should have a property "option" and should contain only text. Only one answer can be correct. The trivia question should be returned on the property "question". Additionally, provide a 2-3 sentence explanation for the answer using the property "answerContext". Also, add a property called "keywords" and provide 1 sentence explaining the answer. Remove all line breaks from the json response and do not add a prefix to the json. Do not stringify the json. Make sure the json result is an object.`;
 // };
 
-const newGamePrompt = (subject) => {
+const newGamePrompt = (subject: string) => {
   return `Given the topic ${subject}, generate a random trivia question that is fun and interesting along with 4 possible answers and provide some context on the answer.`;
 };
 
-const tryAgain = async (category) => {
+const tryAgain = async (category: string) => {
   try {
     const prompt = `Pick a different trivia question on the topic of ${category}.`;
     console.log(`Trying again for ${category}...`);
@@ -105,7 +105,7 @@ const tryAgain = async (category) => {
   }
 };
 
-const newGame = async (category) => {
+const newGame = async (category: string): Promise<any> => {
   try {
     const prompt = newGamePrompt(category);
     console.log(`Looking up new completion for ${category}...`);
@@ -158,7 +158,11 @@ const newGame = async (category) => {
   }
 };
 
-const parseForPlayer = (resp) => {
+const parseForPlayer = (resp: {
+  options: any[];
+  answerContext: any;
+  keywords: any;
+}) => {
   console.log('parseForPlayer resp: ', resp);
   // Remove the answer from the payload
   let options = resp.options?.map((a) => a.option);

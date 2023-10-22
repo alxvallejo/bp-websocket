@@ -4,7 +4,7 @@ const search = new SerpApi.GoogleSearch(
   '6f5cfa676da1b809bd9223edd3ce21c480b6fa06c8638576dee4e8c2bb77f11e'
 );
 
-const searchGoogleImages = async (keywords) => {
+const searchGoogleImages = async (keywords: string) => {
   console.log('keywords: ', keywords);
   if (!keywords) {
     return;
@@ -17,7 +17,7 @@ const searchGoogleImages = async (keywords) => {
   };
   return new Promise((resolve) => {
     try {
-      search.json(query_params, (result) => {
+      search.json(query_params, (result: any) => {
         console.log('result: ', result);
         const { images_results } = result;
         if (images_results.length > 5) {
