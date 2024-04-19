@@ -1,4 +1,4 @@
-import { PlayerAnswer, Game, AnswerImg, Player, Option } from './types';
+import { PlayerAnswer, Game, AnswerImg, Player, Option } from '../types';
 
 class GameService {
   playerPresence: () => void;

@@ -1,4 +1,10 @@
-import { Player, UserData } from './types';
+import {
+  CreateTriviaQuestionInput,
+  ExpressResponse,
+  Player,
+  TriviaQuestion,
+  UserData,
+} from './types';
 
 require('dotenv').config();
 const express = require('express');
@@ -20,6 +26,8 @@ const io = new Server(server, {
     origin: [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:5174',
       'https://indie-8bb1.fly.dev',
       'https://bowpourri-remix.netlify.app',
       'http://192.168.1.170:3000',
@@ -424,6 +432,7 @@ supabase.auth.onAuthStateChange(
       document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
       document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
     } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      console.log('auth state changed: logged in');
       const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
       document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
       document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
@@ -471,7 +480,7 @@ app.post(
   '/addNote',
   async (
     req: { body: { category: any; created_by: any } },
-    res: { send: (arg0: string) => void }
+    res: ExpressResponse
   ) => {
     console.log('req.body: ', req.body);
     const user = supabase.auth.user();
@@ -494,9 +503,48 @@ app.post(
 //     .eq('id', user.id);
 // });
 
-app.get('/', (req: any, res: { send: (arg0: string) => void }) => {
+app.get('/', (req: any, res: ExpressResponse) => {
   res.send('Hello world');
 });
+
+/**
+ * Trivia Questions
+ */
+
+app.get(
+  '/trivia-questions',
+  async (req: { email: string }, res: TriviaQuestion[]) => {
+    let { data: trivia_questions, error } = await supabase
+      .from('trivia_questions')
+      .select('*')
+
+      // Filters
+      .eq('email', req.email);
+    if (error) {
+      return error;
+    }
+    return trivia_questions;
+  }
+);
+
+app.post(
+  '/trivia-question',
+  async (req: { body: CreateTriviaQuestionInput }, res: ExpressResponse) => {
+    const { data, error } = await supabase
+      .from('trivia_questions')
+      .insert([req.body])
+      .select();
+    if (error) {
+      return error;
+    }
+    return data;
+  }
+);
+
+// Extensions
+
+// Movies
+require('./routes/movies')(app);
 
 server.listen(wsPort, () => {
   console.log(`WebSocket server is running on port ${wsPort}`);

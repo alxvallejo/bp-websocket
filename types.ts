@@ -92,3 +92,31 @@ export interface SocketData {
   name: string;
   age: number;
 }
+
+/**
+ * Express basics
+ */
+export interface ExpressResponse {
+  send: (arg0: string) => void;
+}
+
+/**
+ * TriviaQuestions
+ */
+export type CreateTriviaQuestionInput = {
+  created_by: string;
+  question: string;
+  option_1: string;
+  option_2: string;
+  option_3: string;
+  option_4: string;
+};
+
+export type TriviaQuestion = CreateTriviaQuestionInput & {
+  id: string;
+  created_at: string;
+  answered_on: string | null;
+  percent_correct: number | null;
+};
+
+// export type UpdateTriviaQuestion = {}

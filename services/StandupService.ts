@@ -1,4 +1,4 @@
-import { Player } from './types';
+import { Player } from '../types';
 
 type RefreshWheel = (players: Player[], playerData: Player) => void;
 type SpinWheel = (
