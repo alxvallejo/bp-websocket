@@ -72,7 +72,7 @@ const newGamePrompt = (subject: string) => {
   return `Given the topic ${subject}, generate a random trivia question that is fun and interesting along with 4 possible answers and provide some context on the answer.`;
 };
 
-const tryAgain = async (category: string) => {
+export const tryAgain = async (category: string) => {
   try {
     const prompt = `Pick a different trivia question on the topic of ${category}.`;
     console.log(`Trying again for ${category}...`);
@@ -84,12 +84,15 @@ const tryAgain = async (category: string) => {
       functions: getFunctions(),
     });
     console.log('completion: ', completion);
-    let result = completion.choices[0].message.function_call?.arguments
+    const result = completion?.choices?.[0].message?.function_call?.arguments
       .trim()
       .replace(/(\r\n|\n|\r)/gm, '');
     console.log('result: ', result);
-    if (Object.keys(result).length === 0) {
-      return newGame(category);
+    if (!result) {
+      throw Error('No result found');
+    }
+    if (typeof result === 'object' && Object.keys(result).length === 0) {
+      return newTriviaQuestion(category);
     }
     const resp = JSON.parse(result);
     console.log('resp: ', resp);
@@ -100,12 +103,12 @@ const tryAgain = async (category: string) => {
   } catch (e) {
     console.log('an error occurred, try again', e);
     if (category) {
-      return newGame(category);
+      return newTriviaQuestion(category);
     }
   }
 };
 
-const newGame = async (category: string): Promise<any> => {
+export const newTriviaQuestion = async (category: string): Promise<any> => {
   try {
     const prompt = newGamePrompt(category);
     console.log(`Looking up new completion for ${category}...`);
@@ -129,7 +132,7 @@ const newGame = async (category: string): Promise<any> => {
     //   .trim()
     //   .replace(/(\r\n|\n|\r)/gm, '');
     // If using function calls
-    let result = completion.choices[0].message.function_call.arguments
+    const result = completion?.choices?.[0]?.message?.function_call?.arguments
       .trim()
       .replace(/(\r\n|\n|\r)/gm, '');
     // Sometimes it uses a For example: in th e response
@@ -140,6 +143,9 @@ const newGame = async (category: string): Promise<any> => {
     //   result = result.slice(-1) !== ']' ? result + ']' : result;
     // }
     console.log('result: ', result);
+    if (!result) {
+      throw Error('No result found');
+    }
     const resp = JSON.parse(result);
     console.log('resp: ', resp);
 
@@ -153,19 +159,19 @@ const newGame = async (category: string): Promise<any> => {
     // return e;
     // debugger;
     if (category) {
-      return newGame(category);
+      return newTriviaQuestion(category);
     }
   }
 };
 
-const parseForPlayer = (resp: {
+export const parseForPlayer = (resp: {
   options: any[];
   answerContext: any;
   keywords: any;
 }) => {
   console.log('parseForPlayer resp: ', resp);
   // Remove the answer from the payload
-  let options = resp.options?.map((a) => a.option);
+  const options = resp.options?.map((a) => a.option);
   // Additionally remove the answerContext field
   delete resp.answerContext;
   delete resp.keywords;
@@ -176,7 +182,7 @@ const parseForPlayer = (resp: {
 };
 
 module.exports = {
-  newGame,
+  newTriviaQuestion,
   tryAgain,
   parseForPlayer,
 };

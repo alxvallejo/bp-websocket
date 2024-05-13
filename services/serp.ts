@@ -4,7 +4,7 @@ const search = new SerpApi.GoogleSearch(
   '6f5cfa676da1b809bd9223edd3ce21c480b6fa06c8638576dee4e8c2bb77f11e'
 );
 
-const searchGoogleImages = async (keywords: string) => {
+export const searchGoogleImages = async (keywords: string) => {
   console.log('keywords: ', keywords);
   if (!keywords) {
     return;

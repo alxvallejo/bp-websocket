@@ -1,9 +1,8 @@
 import {
-  CreateTriviaQuestionInput,
-  ExpressResponse,
   Player,
-  TriviaQuestion,
   UserData,
+  ExpressResponse,
+  CreateTriviaQuestionInput,
 } from './types';
 
 require('dotenv').config();
@@ -13,8 +12,8 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
-const { GameService } = require('./GameService');
-const { StandupService } = require('./StandupService');
+const { GameService } = require('./services/GameService.js');
+const { StandupService } = require('./services/StandupService.js');
 
 const app = express();
 const server = http.createServer(app);
@@ -83,7 +82,7 @@ const presenceCb = (players: Player[]) => {
 const propogateScores = async (players: Player[]) => {
   console.log('propogating scores');
   // If all players have answered, start a timeout and then emit the answer
-  const unanswered = players.filter((x) => !x.answered);
+  const unanswered = players.filter((x) => !x?.answered);
   if (unanswered.length == 0) {
     console.log(
       'All players have answered, setTimeout for reporting final scores'
@@ -107,15 +106,16 @@ const propogateScores = async (players: Player[]) => {
       io.emit('players', players);
 
       // Save scores
-      let updatedPlayers = [];
-      let correctPlayers = [];
-      for (let player of players) {
+      let updatedPlayers: Player[] = [];
+      let correctPlayers: string[] = [];
+      for (const player of players) {
         const playerData = player.playerData;
         const email = player.email;
         const name = player.name;
         const isCorrect = player.isCorrect;
         let newScore;
-        if (playerData?.score) {
+        const correctPlayers: string[] = []; // Define correctPlayers as an array of strings
+        if ('score' in playerData) {
           newScore = isCorrect ? playerData.score + 1 : playerData.score;
         } else {
           newScore = isCorrect ? 1 : 0;
@@ -130,11 +130,6 @@ const propogateScores = async (players: Player[]) => {
             .from('profiles')
             .update({ score: newScore })
             .eq('id', playerData['id'])
-            .select();
-        } else {
-          const { data, error } = await supabase
-            .from('profiles')
-            .insert({ score: newScore })
             .select();
         }
         const updatedPlayer = {
@@ -302,7 +297,7 @@ io.on('connection', function (socket: any) {
     socket.emit('message', `${userData.email} Joining room ${roomName}`);
     const email = userData.email;
     const name = userData.name || email;
-    let playerData = {
+    const playerData = {
       socketId: socket.id,
       name,
       email,
@@ -351,8 +346,8 @@ io.on('connection', function (socket: any) {
 
   socket.on('clearPlayerStats', async () => {
     console.log('clearing stats');
-    const { error } = await supabase.from('profiles').update({ score: 0 });
-    const { data: playerStats, error: userDataError } = await supabase
+    await supabase.from('profiles').update({ score: 0 });
+    const { data: playerStats, error } = await supabase
       .from('profiles')
       .select();
     socket.emit('playerStats', playerStats);
@@ -369,16 +364,19 @@ io.on('connection', function (socket: any) {
   });
 
   socket.on('editMinPlayers', async (newMinPlayers: number) => {
-    const { data: rules, error: rulesError } = await supabase
+    const { data: rules, error } = await supabase
       .from('rules')
       .update({ min_players: newMinPlayers })
       .eq('id', 1)
       .select();
-    io.emit('gameRules', rules[0]);
+    if (rules) {
+      console.log('rules: ', rules);
+      io.emit('gameRules', rules[0]);
+    }
   });
 
   socket.on('addCategory', async (category: string, created_by: string) => {
-    const { data: newCategory, error: newCatError } = await supabase
+    const { data, error } = await supabase
       .from('categories')
       .insert({ name: category, created_by })
       .select();
@@ -386,7 +384,7 @@ io.on('connection', function (socket: any) {
   });
 
   socket.on('deleteCategory', async (categoryId: string) => {
-    const { data: newCategory, error: newCatError } = await supabase
+    const { data, error } = await supabase
       .from('categories')
       .delete()
       .eq('id', categoryId);
@@ -408,10 +406,10 @@ io.on('connection', function (socket: any) {
     io.emit('newGame', parsed);
   });
 
-  socket.on('kickOff', (name: string) => {
-    const players = game.getPlayers();
-    const newPlayers = players.filter((x: Player) => x.name !== name);
-  });
+  // socket.on('kickOff', (name: string) => {
+  //   const players = game.getPlayers();
+  //   const newPlayers = players.filter((x: Player) => x.name !== name);
+  // });
 
   socket.on('disconnect', (reason: string) => {
     // players = players.filter((x) => x.socketId !== socket.id);
@@ -424,26 +422,27 @@ io.on('connection', function (socket: any) {
 
 app.listen(port, () => console.log(`express listening on port ${port}`));
 
-supabase.auth.onAuthStateChange(
-  (event: string, session: { access_token: any; refresh_token: any }) => {
-    if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-      // delete cookies on sign out
-      const expires = new Date(0).toUTCString();
-      document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
-      document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
-    } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      console.log('auth state changed: logged in');
-      const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
-      document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
-      document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
-    }
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    // delete cookies on sign out
+    const expires = new Date(0).toUTCString();
+    document.cookie = `my-access-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=; path=/; expires=${expires}; SameSite=Lax; secure`;
+  } else if (
+    session &&
+    (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')
+  ) {
+    console.log('auth state changed: logged in');
+    const maxAge = 100 * 365 * 24 * 60 * 60; // 100 years, never expires
+    document.cookie = `my-access-token=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
+    document.cookie = `my-refresh-token=${session.refresh_token}; path=/; max-age=${maxAge}; SameSite=Lax; secure`;
   }
-);
+});
 
 app.get(
   '/categories',
   async (req: any, res: { send: (arg0: string) => void }) => {
-    const { data: categories, error: userDataError } = await supabase
+    const { data: categories, error } = await supabase
       .from('categories')
       .select();
     res.send(JSON.stringify(categories));
@@ -458,7 +457,7 @@ app.post(
   ) => {
     console.log('req.body: ', req.body);
     const { category, created_by } = req.body;
-    const { data: newCategory, error: userDataError } = await supabase
+    const { data, error } = await supabase
       .from('categories')
       .insert({ category, created_by })
       .select();
@@ -483,8 +482,8 @@ app.post(
     res: ExpressResponse
   ) => {
     console.log('req.body: ', req.body);
-    const user = supabase.auth.user();
-    const { category, created_by } = req.body;
+    // const user = supabase.auth.user();
+    // const { category, created_by } = req.body;
     // const { data: newCategory, error: userDataError } = await supabase
     //   .from('categories')
     //   .insert({ category, created_by })
@@ -513,13 +512,13 @@ app.get('/', (req: any, res: ExpressResponse) => {
 
 app.get(
   '/trivia-questions',
-  async (req: { email: string }, res: TriviaQuestion[]) => {
-    let { data: trivia_questions, error } = await supabase
+  async (req: { body: { email: string } }, res: ExpressResponse) => {
+    const { data: trivia_questions, error } = await supabase
       .from('trivia_questions')
       .select('*')
-
-      // Filters
-      .eq('email', req.email);
+      // Filtershttps://www.basedash.com/blog/no-overload-matches-this-call-in-typescript
+      .eq('email', req.body.email);
+    // .returns<TriviaQuestion[]>();
     if (error) {
       return error;
     }

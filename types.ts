@@ -1,3 +1,5 @@
+import { Tables } from './database.types';
+
 export type UserData = {
   email: string;
   name: string;
@@ -16,10 +18,10 @@ export type Player = {
   answered: boolean;
   email: string;
   name: string;
-  playerData: PlayerData;
+  playerData: PlayerData | {};
   socketId: string;
-  isCorrect: boolean;
-};
+  isCorrect?: boolean;
+} | null;
 
 export type PlayerAnswer = {
   email: string;
@@ -112,11 +114,13 @@ export type CreateTriviaQuestionInput = {
   option_4: string;
 };
 
-export type TriviaQuestion = CreateTriviaQuestionInput & {
-  id: string;
-  created_at: string;
-  answered_on: string | null;
-  percent_correct: number | null;
-};
+// export type TriviaQuestion = CreateTriviaQuestionInput & {
+//   id: string;
+//   created_at: string;
+//   answered_on: string | null;
+//   percent_correct: number | null;
+// };
+
+export type TriviaQuestion = Tables<'trivia_questions'>;
 
 // export type UpdateTriviaQuestion = {}

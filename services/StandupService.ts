@@ -40,13 +40,13 @@ class StandupService {
   };
 
   setPlayer = (email: string, playerData: Player) => {
-    let players = this.players || [];
+    const players = this.players || [];
     players[email] = playerData;
     this.players = players;
   };
 
   removePlayer = (email: string) => {
-    let players = this.players || {};
+    const players = this.players || {};
     delete players[email];
     this.players = players;
     return this.getPlayers();

@@ -1,8 +1,8 @@
 import { PlayerAnswer, Game, AnswerImg, Player, Option } from '../types';
 
 class GameService {
-  playerPresence: () => void;
-  propogateScores: (players: (Player | null)[]) => void;
+  playerPresence: (players: Player[]) => void;
+  propogateScores: (players: Player[]) => Promise<void>;
   players: { [email: string]: Player | null };
   playerAnswers: PlayerAnswer[] | null;
   category: string | null;
@@ -12,7 +12,10 @@ class GameService {
   answerContext: string | null;
   keywords: string | null;
 
-  constructor(presenceCb: () => void, propogateScores: () => void) {
+  constructor(
+    presenceCb: (players: Player[]) => void,
+    propogateScores: (players: Player[]) => Promise<void>
+  ) {
     this.playerPresence = presenceCb;
     this.propogateScores = propogateScores;
     this.players = {};
@@ -35,21 +38,21 @@ class GameService {
     this.keywords = null;
   };
 
-  getPlayers = () => {
-    const players = Object.values(this.players);
+  getPlayers = (): Player[] => {
+    const players = Object.values(this.players).filter((x) => x !== null);
     console.log('players: ', players);
     return players;
   };
 
   setPlayer = (email: string, player: Player) => {
-    let players = this.players || {};
+    const players = this.players || {};
     players[email] = player;
     this.players = players;
     return this.getPlayers();
   };
 
   removePlayer = (email: string) => {
-    let players = this.players || {};
+    const players = this.players || {};
     players[email] = null;
     this.players = players;
   };
@@ -114,9 +117,9 @@ class GameService {
     if (!this.newGame) {
       return;
     }
-    const options = this.newGame.options;
+    // const options = this.newGame.options;
     // const matchingOption = options.find((x) => x.option == answer);
-    let updatePlayer = this.getPlayer(email);
+    const updatePlayer = this.getPlayer(email);
     if (!updatePlayer) {
       return;
     }
@@ -128,17 +131,17 @@ class GameService {
     this.propogateScores(players);
   };
 
-  getPlayerScores = () => {
+  getPlayerScores = (): Player[] => {
     if (!this.correctAnswer) {
-      return this.players;
+      return this.getPlayers();
     }
     // Loop through player answers and update the players object with `isCorrect`
     this.playerAnswers?.map((player, i) => {
       const isCorrect = this.correctAnswer?.option == player.answer;
       const email = player.email;
-      let p = this.players?.[email];
+      const p = this.players?.[email];
       if (p) {
-        let newP = { ...p, isCorrect };
+        const newP = { ...p, isCorrect };
         this.players[email] = newP;
       }
     });
